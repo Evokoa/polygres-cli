@@ -4,7 +4,7 @@ import json
 import os
 import stat
 import subprocess
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -2633,7 +2633,9 @@ def test_quiet_login_prints_essential_fallback_to_stderr_when_browser_fails(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    expires = (datetime.now(UTC) + timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+    expires = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat().replace(
+        "+00:00", "Z"
+    )
     _stub(
         respx.post(f"{API_BASE_URL}/cli/auth/start"),
         return_value=httpx.Response(
@@ -2731,7 +2733,7 @@ def test_config_save_fails_closed_when_owner_only_permissions_cannot_be_set(
 def test_retry_after_http_date_is_parsed_as_non_negative_seconds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    now = datetime(2026, 7, 9, 12, 0, tzinfo=UTC)
+    now = datetime(2026, 7, 9, 12, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(cli_client.time, "time", lambda: now.timestamp())
 
     delay = cli_client._retry_after_seconds("Thu, 09 Jul 2026 12:00:05 GMT")
