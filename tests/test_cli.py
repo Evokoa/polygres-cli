@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -34,6 +36,46 @@ ROUTE_CTX = getattr(respx, "mo" + "ck")
 
 def _stub(route: object, **kwargs: object) -> object:
     return getattr(route, "mo" + "ck")(**kwargs)
+
+
+def _stub_csv_direct_preview(
+    preview: dict[str, object], *, status_code: int = 200
+) -> tuple[object, object, object, object]:
+    session_route = _stub(
+        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/upload-sessions"),
+        return_value=httpx.Response(
+            status_code if status_code != 200 else 200,
+            json=(
+                preview
+                if status_code != 200
+                else {
+                    "upload": {
+                        "job_id": IMPORT_ID,
+                        "upload_url": "https://blob.example.test/file.csv?sig=secret",
+                        "block_size_bytes": 8 * 1024 * 1024,
+                    }
+                }
+            ),
+        ),
+    )
+    block_route = _stub(
+        respx.put(
+            re.compile(r"https://blob\.example\.test/file\.csv\?.*comp=block&blockid=.*")
+        ),
+        return_value=httpx.Response(201),
+    )
+    commit_route = _stub(
+        respx.put(re.compile(r"https://blob\.example\.test/file\.csv\?.*comp=blocklist.*")),
+        return_value=httpx.Response(201),
+    )
+    complete_route = _stub(
+        respx.post(
+            f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/upload-sessions/"
+            f"{IMPORT_ID}/complete"
+        ),
+        return_value=httpx.Response(200, json=preview),
+    )
+    return session_route, block_route, commit_route, complete_route
 
 
 def run_cli(
@@ -93,7 +135,7 @@ def test_version_and_config_path_json(
 ) -> None:
     rc, out, _ = run_cli(["--version"], capsys, monkeypatch, tmp_path)
     assert rc == 0
-    assert out.strip() == "polygres 0.1.1"
+    assert out.strip() == "polygres 0.1.2"
 
     rc, out, _ = run_cli(["--json", "config", "path"], capsys, monkeypatch, tmp_path)
     assert rc == 0
@@ -430,7 +472,7 @@ def test_projects_list_uses_env_token_and_selected_project_json(
     assert err == ""
     assert route.called
     assert route.calls[0].request.headers["Authorization"] == f"Bearer {ACCESS_TOKEN}"
-    assert route.calls[0].request.headers["User-Agent"] == "polygres-cli/0.1.1"
+    assert route.calls[0].request.headers["User-Agent"] == "polygres-cli/0.1.2"
     assert json.loads(out) == {
         "projects": [{"id": PROJECT_ID, "name": "Support", "status": "ready"}],
         "selected_project_id": PROJECT_ID,
@@ -1066,18 +1108,14 @@ def test_import_csv_sends_sample_row_count_only_to_preview(
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
     csv_path = tmp_path / "documents.csv"
     csv_path.write_text("id,title\n1,Hello\n", encoding="utf-8")
-    preview_route = _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/preview"),
-        return_value=httpx.Response(
-            200,
-            json={
-                "request_id": "req_preview",
-                "preview": {
-                    "job_id": IMPORT_ID,
-                    "columns": [{"name": "id"}, {"name": "title"}],
-                },
+    session_route, block_route, commit_route, preview_route = _stub_csv_direct_preview(
+        {
+            "request_id": "req_preview",
+            "preview": {
+                "job_id": IMPORT_ID,
+                "columns": [{"name": "id"}, {"name": "title"}],
             },
-        ),
+        }
     )
     import_route = _stub(
         respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"),
@@ -1110,9 +1148,15 @@ def test_import_csv_sends_sample_row_count_only_to_preview(
     assert err == ""
     assert preview_route.called
     assert import_route.called
-    preview_body = preview_route.calls[0].request.content
+    complete_payload = json.loads(preview_route.calls[0].request.content)
     import_payload = json.loads(import_route.calls[0].request.content)
-    assert b'name="sample_row_count"' in preview_body
+    assert session_route.called
+    assert block_route.called
+    assert commit_route.called
+    assert complete_payload["sample_row_count"] == 50
+    assert complete_payload["file_size_bytes"] == csv_path.stat().st_size
+    assert complete_payload["sha256"] == hashlib.sha256(csv_path.read_bytes()).hexdigest()
+    assert csv_path.read_bytes() not in preview_route.calls[0].request.content
     assert import_route.calls[0].request.headers["content-type"] == "application/json"
     assert import_payload["job_id"] == IMPORT_ID
     assert [column["name"] for column in import_payload["columns"]] == ["id", "title"]
@@ -1129,19 +1173,16 @@ def test_import_csv_preserves_tier_limit_error_and_skips_final_submission(
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
     csv_path = tmp_path / "documents.csv"
     csv_path.write_text("id,title\n1,Hello\n", encoding="utf-8")
-    preview_route = _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/preview"),
-        return_value=httpx.Response(
-            413,
-            json={
-                "request_id": "req_import_limit",
-                "error": {
-                    "code": "IMPORT_LIMIT_EXCEEDED",
-                    "message": "File exceeds the project tier storage limit.",
-                    "details": {"limit_bytes": 8, "source": "storage_bytes"},
-                },
+    preview_route, _, _, _ = _stub_csv_direct_preview(
+        {
+            "request_id": "req_import_limit",
+            "error": {
+                "code": "IMPORT_LIMIT_EXCEEDED",
+                "message": "File exceeds the project tier storage limit.",
+                "details": {"limit_bytes": 8, "source": "storage_bytes"},
             },
-        ),
+        },
+        status_code=413,
     )
     import_route = _stub(respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"))
 
@@ -1605,16 +1646,12 @@ def test_csv_import_uses_preview_columns_and_wait_polling(
     csv_path = tmp_path / "documents.csv"
     csv_path.write_text("id,title\n1,Hello\n", encoding="utf-8")
     columns = [{"name": "id", "type": "text", "nullable": False}]
-    preview_route = _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/preview"),
-        return_value=httpx.Response(
-            200,
-            json={
-                "request_id": "req_preview",
-                "preview": {"job_id": IMPORT_ID, "columns": columns},
-            },
-        ),
-    )
+    preview_route = _stub_csv_direct_preview(
+        {
+            "request_id": "req_preview",
+            "preview": {"job_id": IMPORT_ID, "columns": columns},
+        }
+    )[3]
     import_route = _stub(
         respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"),
         return_value=httpx.Response(
@@ -1846,7 +1883,7 @@ def test_login_browser_fallback_polls_stores_tokens_and_redacts_output(
     assert ACCESS_TOKEN not in out
     assert REFRESH_TOKEN not in out
     assert json.loads(start_route.calls[0].request.content) == {
-        "client": {"name": "polygres-cli", "version": "0.1.1"}
+        "client": {"name": "polygres-cli", "version": "0.1.2"}
     }
     assert json.loads(poll_route.calls[0].request.content) == {
         "login_session_id": "cls_abcdefghijklmnopqrstuvwxyz",
@@ -1914,22 +1951,18 @@ def test_csv_import_propagates_preview_effective_parser_settings(
     path = tmp_path / "documents.csv"
     path.write_text("id|title\n1|Hello\n", encoding="utf-8")
     columns = [{"name": "id", "type": "text", "nullable": False}]
-    _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/preview"),
-        return_value=httpx.Response(
-            200,
-            json={
-                "preview": {
-                    "job_id": IMPORT_ID,
-                    "encoding": "utf-8-sig",
-                    "delimiter": "|",
-                    "quote_char": "'",
-                    "escape_char": "\\",
-                    "has_header": False,
-                    "columns": columns,
-                }
-            },
-        ),
+    _stub_csv_direct_preview(
+        {
+            "preview": {
+                "job_id": IMPORT_ID,
+                "encoding": "utf-8-sig",
+                "delimiter": "|",
+                "quote_char": "'",
+                "escape_char": "\\",
+                "has_header": False,
+                "columns": columns,
+            }
+        }
     )
     import_route = _stub(
         respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"),
@@ -2084,11 +2117,8 @@ def test_human_import_polling_writes_progress_only_to_stderr(
     path = tmp_path / "documents.csv"
     path.write_text("id\n1\n", encoding="utf-8")
     monkeypatch.setattr(cli.time, "sleep", lambda _seconds: None)
-    _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/preview"),
-        return_value=httpx.Response(
-            200, json={"preview": {"job_id": IMPORT_ID, "columns": [{"name": "id"}]}}
-        ),
+    _stub_csv_direct_preview(
+        {"preview": {"job_id": IMPORT_ID, "columns": [{"name": "id"}]}}
     )
     _stub(
         respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"),

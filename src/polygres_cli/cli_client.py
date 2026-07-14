@@ -1,19 +1,21 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import json as jsonlib
 import time
 from collections.abc import Callable
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, BinaryIO
-from urllib.parse import urlsplit
+from typing import Any
+from urllib.parse import quote, urlsplit
 
 import httpx
 
 from polygres_cli.cli_errors import AUTH, UNAVAILABLE, CliError, api_error_from_response
 from polygres_cli.cli_secrets import redact_string
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 RETRY_STATUSES = {408, 429, 500, 502, 503, 504}
 HEAVY_REQUEST_TIMEOUT = 120.0
 
@@ -111,13 +113,121 @@ class CliControlPlaneClient:
         return self._delete(f"/projects/{project_id}/api-keys/{key_id}")
 
     def csv_preview(self, project_id: str, file: Path, fields: dict[str, str]) -> dict[str, Any]:
+        file_size = file.stat().st_size
+        session = self._post(
+            f"/projects/{project_id}/imports/csv/upload-sessions",
+            {"original_filename": file.name, "file_size_bytes": file_size},
+        )
+        upload = session.get("upload")
+        if not isinstance(upload, dict):
+            raise CliError("IMPORT_INVALID", "Upload session response is invalid.")
+        job_id = upload.get("job_id")
+        upload_url = upload.get("upload_url")
+        block_size = upload.get("block_size_bytes")
+        if (
+            not isinstance(job_id, str)
+            or not isinstance(upload_url, str)
+            or isinstance(block_size, bool)
+            or not isinstance(block_size, int)
+            or block_size <= 0
+        ):
+            raise CliError("IMPORT_INVALID", "Upload session response is incomplete.")
+        sha256 = self._upload_csv_blocks(file, upload_url, block_size)
+        payload: dict[str, Any] = {
+            "job_id": job_id,
+            "original_filename": file.name,
+            "file_size_bytes": file_size,
+            "sha256": sha256,
+            "target_schema": fields.get("target_schema", "public"),
+            "target_table": fields.get("target_table"),
+            "mode": fields.get("mode", "create_table"),
+            "encoding": fields.get("encoding", "utf-8"),
+            "quote_char": fields.get("quote_char", '"'),
+            "has_header": fields.get("has_header", "true") == "true",
+            "sample_row_count": int(fields.get("sample_row_count", "50")),
+        }
+        for name in ("delimiter", "escape_char"):
+            if name in fields:
+                payload[name] = fields[name]
+        return self._post(
+            f"/projects/{project_id}/imports/csv/upload-sessions/{job_id}/complete",
+            payload,
+            timeout=HEAVY_REQUEST_TIMEOUT,
+        )
+
+    def _upload_csv_blocks(self, file: Path, upload_url: str, block_size: int) -> str:
+        digest = hashlib.sha256()
+        block_ids: list[str] = []
         with file.open("rb") as handle:
-            return self._multipart(
-                "POST",
-                f"/projects/{project_id}/imports/csv/preview",
-                handle,
-                file.name,
-                fields,
+            index = 0
+            while chunk := handle.read(block_size):
+                digest.update(chunk)
+                block_id = base64.b64encode(f"{index:08d}".encode()).decode()
+                block_ids.append(block_id)
+                block_url = f"{upload_url}&comp=block&blockid={quote(block_id, safe='')}"
+                self._blob_request(
+                    "PUT",
+                    block_url,
+                    content=chunk,
+                    headers={
+                        "Content-MD5": base64.b64encode(
+                            hashlib.md5(chunk, usedforsecurity=False).digest()
+                        ).decode(),
+                        "x-ms-version": "2023-11-03",
+                    },
+                )
+                index += 1
+        if block_ids:
+            block_list = "<?xml version=\"1.0\" encoding=\"utf-8\"?><BlockList>" + "".join(
+                f"<Latest>{block_id}</Latest>" for block_id in block_ids
+            ) + "</BlockList>"
+            self._blob_request(
+                "PUT",
+                f"{upload_url}&comp=blocklist",
+                content=block_list.encode(),
+                headers={"Content-Type": "application/xml", "x-ms-version": "2023-11-03"},
+            )
+        else:
+            self._blob_request(
+                "PUT",
+                upload_url,
+                content=b"",
+                headers={"x-ms-blob-type": "BlockBlob", "x-ms-version": "2023-11-03"},
+            )
+        return digest.hexdigest()
+
+    def _blob_request(
+        self, method: str, url: str, *, content: bytes, headers: dict[str, str]
+    ) -> None:
+        response: httpx.Response | None = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                response = self._client.request(
+                    method,
+                    url,
+                    content=content,
+                    headers=headers,
+                    timeout=HEAVY_REQUEST_TIMEOUT,
+                )
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                if attempt < self._max_retries:
+                    _sleep_before_retry(attempt, None)
+                    continue
+                raise CliError(
+                    "IMPORT_UPLOAD_FAILED",
+                    "Direct CSV upload is unavailable.",
+                    exit_code=UNAVAILABLE,
+                ) from exc
+            if response.status_code in RETRY_STATUSES and attempt < self._max_retries:
+                _sleep_before_retry(attempt, response.headers.get("Retry-After"))
+                continue
+            break
+        assert response is not None
+        if response.is_error:
+            raise CliError(
+                "IMPORT_UPLOAD_FAILED",
+                f"Direct CSV upload failed with HTTP {response.status_code}.",
+                exit_code=UNAVAILABLE,
             )
 
     def start_csv_import(
@@ -243,30 +353,12 @@ class CliControlPlaneClient:
     def _delete(self, path: str) -> dict[str, Any]:
         return self._request("DELETE", path, retry=False)
 
-    def _multipart(
-        self,
-        method: str,
-        path: str,
-        file: BinaryIO,
-        filename: str,
-        fields: dict[str, str],
-    ) -> dict[str, Any]:
-        return self._request(
-            method,
-            path,
-            data=fields,
-            files={"file": (filename, file, "text/csv")},
-            retry=False,
-        )
-
     def _request(
         self,
         method: str,
         path: str,
         *,
         json: dict[str, Any] | None = None,
-        data: dict[str, str] | None = None,
-        files: dict[str, Any] | None = None,
         auth: bool = True,
         retry: bool = False,
         allow_refresh: bool = True,
@@ -289,8 +381,6 @@ class CliControlPlaneClient:
             try:
                 request_kwargs: dict[str, Any] = {
                     "headers": headers,
-                    "data": data,
-                    "files": files,
                 }
                 if json is not None:
                     headers["Content-Type"] = "application/json"
@@ -334,8 +424,6 @@ class CliControlPlaneClient:
                     method,
                     path,
                     json=json,
-                    data=data,
-                    files=files,
                     auth=auth,
                     retry=retry,
                     allow_refresh=False,
