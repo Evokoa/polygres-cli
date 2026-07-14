@@ -93,7 +93,7 @@ def test_version_and_config_path_json(
 ) -> None:
     rc, out, _ = run_cli(["--version"], capsys, monkeypatch, tmp_path)
     assert rc == 0
-    assert out.strip() == "polygres 0.1.0"
+    assert out.strip() == "polygres 0.1.1"
 
     rc, out, _ = run_cli(["--json", "config", "path"], capsys, monkeypatch, tmp_path)
     assert rc == 0
@@ -430,7 +430,7 @@ def test_projects_list_uses_env_token_and_selected_project_json(
     assert err == ""
     assert route.called
     assert route.calls[0].request.headers["Authorization"] == f"Bearer {ACCESS_TOKEN}"
-    assert route.calls[0].request.headers["User-Agent"] == "polygres-cli/0.1.0"
+    assert route.calls[0].request.headers["User-Agent"] == "polygres-cli/0.1.1"
     assert json.loads(out) == {
         "projects": [{"id": PROJECT_ID, "name": "Support", "status": "ready"}],
         "selected_project_id": PROJECT_ID,
@@ -1111,12 +1111,55 @@ def test_import_csv_sends_sample_row_count_only_to_preview(
     assert preview_route.called
     assert import_route.called
     preview_body = preview_route.calls[0].request.content
-    import_body = import_route.calls[0].request.content
+    import_payload = json.loads(import_route.calls[0].request.content)
     assert b'name="sample_row_count"' in preview_body
-    assert b'name="sample_row_count"' not in import_body
-    assert b'name="job_id"' in import_body
-    assert b'name="columns"' in import_body
+    assert import_route.calls[0].request.headers["content-type"] == "application/json"
+    assert import_payload["job_id"] == IMPORT_ID
+    assert [column["name"] for column in import_payload["columns"]] == ["id", "title"]
+    assert str(csv_path).encode() not in import_route.calls[0].request.content
     assert json.loads(out)["import"]["status"] == "succeeded"
+
+
+@ROUTE_CTX
+def test_import_csv_preserves_tier_limit_error_and_skips_final_submission(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    csv_path = tmp_path / "documents.csv"
+    csv_path.write_text("id,title\n1,Hello\n", encoding="utf-8")
+    preview_route = _stub(
+        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/preview"),
+        return_value=httpx.Response(
+            413,
+            json={
+                "request_id": "req_import_limit",
+                "error": {
+                    "code": "IMPORT_LIMIT_EXCEEDED",
+                    "message": "File exceeds the project tier storage limit.",
+                    "details": {"limit_bytes": 8, "source": "storage_bytes"},
+                },
+            },
+        ),
+    )
+    import_route = _stub(respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"))
+
+    rc, out, err = run_cli(
+        ["--json", "import", "csv", str(csv_path), "--table", "documents"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 2
+    assert err == ""
+    payload = json.loads(out)
+    assert payload["error"]["code"] == "IMPORT_LIMIT_EXCEEDED"
+    assert payload["error"]["details"] == {"limit_bytes": 8, "source": "storage_bytes"}
+    assert payload["request_id"] == "req_import_limit"
+    assert preview_route.call_count == 1
+    assert import_route.call_count == 0
 
 
 @ROUTE_CTX
@@ -1803,7 +1846,7 @@ def test_login_browser_fallback_polls_stores_tokens_and_redacts_output(
     assert ACCESS_TOKEN not in out
     assert REFRESH_TOKEN not in out
     assert json.loads(start_route.calls[0].request.content) == {
-        "client": {"name": "polygres-cli", "version": "0.1.0"}
+        "client": {"name": "polygres-cli", "version": "0.1.1"}
     }
     assert json.loads(poll_route.calls[0].request.content) == {
         "login_session_id": "cls_abcdefghijklmnopqrstuvwxyz",

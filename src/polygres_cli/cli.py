@@ -45,7 +45,6 @@ UUID_LIKE_RE = re.compile(
 )
 SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 MIGRATION_NAME_RE = SQL_IDENTIFIER_RE
-MAX_CSV_UPLOAD_BYTES = 1024**3
 GRAPH_CONFIGURATION_KEYS = {
     "registered_tables",
     "registered_relationships",
@@ -992,19 +991,6 @@ def handle_text_configs_delete(ctx: Context, args: argparse.Namespace) -> int:
 
 def handle_import_csv(ctx: Context, args: argparse.Namespace) -> int:
     file_path = _readable_file(args.file)
-    try:
-        file_size = file_path.stat().st_size
-    except OSError as exc:
-        raise CliError(
-            "VALIDATION_ERROR", f"Unable to read file: {file_path}", exit_code=USAGE
-        ) from exc
-    if file_size > MAX_CSV_UPLOAD_BYTES:
-        raise CliError(
-            "IMPORT_LIMIT_EXCEEDED",
-            "CSV file exceeds the 1 GiB local upload limit.",
-            exit_code=USAGE,
-            details={"limit_bytes": MAX_CSV_UPLOAD_BYTES, "file_size_bytes": file_size},
-        )
     _validate_identifiers(args.schema, args.table)
     preview_fields = {
         "target_schema": args.schema,
@@ -1032,22 +1018,20 @@ def handle_import_csv(ctx: Context, args: argparse.Namespace) -> int:
     columns = preview_payload.get("columns")
     if not isinstance(columns, list):
         raise CliError("IMPORT_INVALID", "CSV preview response did not include columns.")
-    import_fields = {
+    import_fields: dict[str, object] = {
         "target_schema": args.schema,
         "target_table": args.table,
         "mode": args.mode,
         "encoding": str(preview_payload.get("encoding", args.encoding)),
         "delimiter": str(preview_payload.get("delimiter", args.delimiter or "")),
         "quote_char": str(preview_payload.get("quote_char", args.quote_char or '"')),
-        "has_header": (
-            "true" if preview_payload.get("has_header", not args.no_header) else "false"
-        ),
+        "has_header": bool(preview_payload.get("has_header", not args.no_header)),
     }
     effective_escape = preview_payload.get("escape_char", args.escape_char)
     if effective_escape is not None:
         import_fields["escape_char"] = str(effective_escape)
-    import_fields.update({"job_id": job_id, "columns": json.dumps(columns)})
-    started = ctx.client.start_csv_import(project_id, file_path, import_fields)
+    import_fields.update({"job_id": job_id, "columns": columns})
+    started = ctx.client.start_csv_import(project_id, import_fields)
     output = _import_output(started)
     if args.wait and output["import"].get("status") not in {"succeeded", "failed", "cancelled"}:
         import_id = output["import"].get("id")

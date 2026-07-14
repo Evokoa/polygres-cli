@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import json as jsonlib
 import time
 from collections.abc import Callable
 from email.utils import parsedate_to_datetime
@@ -13,7 +13,7 @@ import httpx
 from polygres_cli.cli_errors import AUTH, UNAVAILABLE, CliError, api_error_from_response
 from polygres_cli.cli_secrets import redact_string
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 RETRY_STATUSES = {408, 429, 500, 502, 503, 504}
 HEAVY_REQUEST_TIMEOUT = 120.0
 
@@ -121,16 +121,13 @@ class CliControlPlaneClient:
             )
 
     def start_csv_import(
-        self, project_id: str, file: Path, fields: dict[str, str]
+        self, project_id: str, fields: dict[str, Any]
     ) -> dict[str, Any]:
-        with file.open("rb") as handle:
-            return self._multipart(
-                "POST",
-                f"/projects/{project_id}/imports/csv",
-                handle,
-                file.name,
-                fields,
-            )
+        return self._post(
+            f"/projects/{project_id}/imports/csv",
+            fields,
+            timeout=HEAVY_REQUEST_TIMEOUT,
+        )
 
     def list_imports(self, project_id: str) -> dict[str, Any]:
         return self._get(f"/projects/{project_id}/imports")
@@ -292,10 +289,12 @@ class CliControlPlaneClient:
             try:
                 request_kwargs: dict[str, Any] = {
                     "headers": headers,
-                    "json": json,
                     "data": data,
                     "files": files,
                 }
+                if json is not None:
+                    headers["Content-Type"] = "application/json"
+                    request_kwargs["content"] = jsonlib.dumps(json)
                 request_timeout = timeout
                 if remaining is not None:
                     request_timeout = min(request_timeout or self._timeout, remaining)
@@ -392,7 +391,7 @@ def _json_payload(response: httpx.Response) -> dict[str, Any]:
         return {}
     try:
         payload = response.json()
-    except json.JSONDecodeError:
+    except jsonlib.JSONDecodeError:
         return {}
     return payload if isinstance(payload, dict) else {}
 

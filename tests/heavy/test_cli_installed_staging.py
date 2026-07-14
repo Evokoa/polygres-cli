@@ -31,7 +31,7 @@ def test_installed_cli_staging_whoami_contract(tmp_path: Path) -> None:
         [executable, "--version"], env=env, text=True, capture_output=True, check=False
     )
     assert version.returncode == 0
-    assert version.stdout.strip() == "polygres 0.1.0"
+    assert version.stdout.strip() == "polygres 0.1.1"
 
     whoami = subprocess.run(
         [executable, "--json", "whoami"],
