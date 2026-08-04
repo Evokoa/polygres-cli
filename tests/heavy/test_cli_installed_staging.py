@@ -31,7 +31,20 @@ def test_installed_cli_staging_whoami_contract(tmp_path: Path) -> None:
         [executable, "--version"], env=env, text=True, capture_output=True, check=False
     )
     assert version.returncode == 0
-    assert version.stdout.strip() == "polygres 0.1.2"
+    assert version.stdout.strip() == "polygres 0.2.0"
+
+    notices = subprocess.run(
+        [executable, "--json", "notices"],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert notices.returncode == 0, notices.stderr
+    assert notices.stdout == ""
+    assert "No active CLI notices." in notices.stderr or any(
+        label in notices.stderr for label in ("[INFO]", "[WARNING]", "[CRITICAL]")
+    )
 
     whoami = subprocess.run(
         [executable, "--json", "whoami"],
@@ -48,3 +61,7 @@ def test_installed_cli_staging_whoami_contract(tmp_path: Path) -> None:
     assert payload["membership"]["status"] == "active"
     assert "access_token" not in whoami.stdout
     assert "refresh_token" not in whoami.stdout
+    assert "No active CLI notices." not in whoami.stdout
+    assert not any(
+        label in whoami.stdout for label in ("[INFO]", "[WARNING]", "[CRITICAL]")
+    )

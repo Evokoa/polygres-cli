@@ -14,7 +14,7 @@ import pytest
 import respx
 
 from polygres_cli import cli, cli_client
-from polygres_cli.cli_auth import validate_start_response
+from polygres_cli.cli_auth import normalize_poll_response, validate_start_response
 from polygres_cli.cli_client import CliControlPlaneClient
 from polygres_cli.cli_config import ConfigStore
 from polygres_cli.cli_secrets import redact
@@ -25,10 +25,10 @@ PROJECT_UUID = "2df47496-0a50-4f96-ab7a-e58c5aaeda8a"
 CONFIG_ID = "123e4567-e89b-12d3-a456-426614174000"
 IMPORT_ID = "223e4567-e89b-12d3-a456-426614174000"
 API_BASE_URL = "https://api.example.test/v1"
-ACCESS_TOKEN = "access_token_secret"
-REFRESH_TOKEN = "refresh_token_secret"
-NEW_ACCESS_TOKEN = "new_access_token_secret"
-NEW_REFRESH_TOKEN = "new_refresh_token_secret"
+ACCESS_TOKEN = "pcli_at_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
+REFRESH_TOKEN = "pcli_rt_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
+NEW_ACCESS_TOKEN = "pcli_at_BCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefgh"
+NEW_REFRESH_TOKEN = "pcli_rt_BCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefgh"
 API_KEY_SECRET = "poly_live_0123456789abcdef0123456789abcdef"
 POLL_TOKEN = "pcli_poll_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
 ROUTE_CTX = getattr(respx, "mo" + "ck")
@@ -88,6 +88,7 @@ def run_cli(
 ) -> tuple[int, str, str]:
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("POLYGRES_API_BASE_URL", API_BASE_URL)
+    monkeypatch.setattr(cli, "_display_post_command_notices", lambda **_kwargs: None)
     if token is None:
         monkeypatch.delenv("POLYGRES_ACCESS_TOKEN", raising=False)
     else:
@@ -135,7 +136,7 @@ def test_version_and_config_path_json(
 ) -> None:
     rc, out, _ = run_cli(["--version"], capsys, monkeypatch, tmp_path)
     assert rc == 0
-    assert out.strip() == "polygres 0.1.2"
+    assert out.strip() == "polygres 0.2.0"
 
     rc, out, _ = run_cli(["--json", "config", "path"], capsys, monkeypatch, tmp_path)
     assert rc == 0
@@ -270,7 +271,8 @@ def test_stored_auth_refreshes_once_persists_and_retries_original_request(
     assert auth == {
         "access_token": NEW_ACCESS_TOKEN,
         "refresh_token": NEW_REFRESH_TOKEN,
-        "expires_at": "2026-07-08T13:00:00Z",
+        "access_expires_at": "2026-07-08T13:00:00Z",
+        "refresh_expires_at": "2026-07-08T13:00:00Z",
         "user": {"id": "user_new", "email": "new@example.test"},
     }
     assert json.loads(out)["request_id"] == "req_projects"
@@ -316,7 +318,7 @@ def test_refresh_auth_failure_clears_stored_tokens_and_exits_3(
     assert refresh_route.called
     assert "auth" not in selected_config(tmp_path)
     payload = json.loads(out)
-    assert payload["error"]["code"] == "AUTH_EXPIRED"
+    assert payload["error"]["code"] == "TOKEN_EXPIRED"
     assert payload["request_id"] == "req_refresh"
 
 
@@ -472,7 +474,7 @@ def test_projects_list_uses_env_token_and_selected_project_json(
     assert err == ""
     assert route.called
     assert route.calls[0].request.headers["Authorization"] == f"Bearer {ACCESS_TOKEN}"
-    assert route.calls[0].request.headers["User-Agent"] == "polygres-cli/0.1.2"
+    assert route.calls[0].request.headers["User-Agent"] == "polygres-cli/0.2.0"
     assert json.loads(out) == {
         "projects": [{"id": PROJECT_ID, "name": "Support", "status": "ready"}],
         "selected_project_id": PROJECT_ID,
@@ -1549,6 +1551,122 @@ def test_vector_create_validates_dimensions_and_payload(
 
 
 @ROUTE_CTX
+def test_vector_list_shows_default_status_and_error_in_human_and_json_output(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/vector/configurations"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_vectors",
+                "configurations": [
+                    {
+                        "id": CONFIG_ID,
+                        "name": "docs",
+                        "is_default": True,
+                        "index_status": "failed",
+                        "index_error": "vector_index_invalid",
+                        "dimensions": 1536,
+                        "metric": "cosine",
+                    }
+                ],
+            },
+        ),
+    )
+
+    rc, human, err = run_cli(["vector", "configs", "list"], capsys, monkeypatch, tmp_path)
+    json_rc, structured, json_err = run_cli(
+        ["--json", "vector", "configs", "list"], capsys, monkeypatch, tmp_path
+    )
+
+    assert rc == 0
+    assert err == ""
+    assert "is_default" in human
+    assert "index_status" in human
+    assert "index_error" in human
+    assert "True" in human
+    assert "vector_index_invalid" in human
+    assert json_rc == 0
+    assert json_err == ""
+    assert json.loads(structured)["configurations"][0]["index_error"] == "vector_index_invalid"
+
+
+@ROUTE_CTX
+def test_vector_set_default_patches_configuration_and_validates_uuid(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    route = _stub(
+        respx.patch(f"{API_BASE_URL}/projects/{PROJECT_ID}/vector/configurations/{CONFIG_ID}"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_default",
+                "configuration": {"id": CONFIG_ID, "name": "docs", "is_default": True},
+            },
+        ),
+    )
+
+    rc, out, err = run_cli(
+        ["--json", "vector", "configs", "set-default", CONFIG_ID],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+    invalid_rc, invalid_out, _ = run_cli(
+        ["--json", "vector", "configs", "set-default", "fuzzy-id"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 0
+    assert err == ""
+    assert json.loads(route.calls[0].request.content) == {"is_default": True}
+    assert json.loads(out)["configuration"]["is_default"] is True
+    assert invalid_rc == 2
+    assert json.loads(invalid_out)["error"]["code"] == "VALIDATION_ERROR"
+    assert len(route.calls) == 1
+
+
+@ROUTE_CTX
+def test_vector_reindex_verification_failure_exits_nonzero(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub(
+        respx.post(
+            f"{API_BASE_URL}/projects/{PROJECT_ID}/vector/configurations/{CONFIG_ID}/reindex"
+        ),
+        return_value=httpx.Response(
+            409,
+            json={
+                "error": {
+                    "code": "VECTOR_INDEX_VERIFICATION_FAILED",
+                    "message": "The rebuilt vector index did not match its configuration.",
+                }
+            },
+        ),
+    )
+
+    rc, out, err = run_cli(
+        ["--json", "vector", "reindex", CONFIG_ID], capsys, monkeypatch, tmp_path
+    )
+
+    assert rc == 1
+    assert err == ""
+    assert json.loads(out)["error"]["code"] == "VECTOR_INDEX_VERIFICATION_FAILED"
+
+
+@ROUTE_CTX
 def test_text_generated_tsvector_applies_migration_then_creates_config(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -1883,7 +2001,7 @@ def test_login_browser_fallback_polls_stores_tokens_and_redacts_output(
     assert ACCESS_TOKEN not in out
     assert REFRESH_TOKEN not in out
     assert json.loads(start_route.calls[0].request.content) == {
-        "client": {"name": "polygres-cli", "version": "0.1.2"}
+        "client": {"name": "polygres-cli", "version": "0.2.0"}
     }
     assert json.loads(poll_route.calls[0].request.content) == {
         "login_session_id": "cls_abcdefghijklmnopqrstuvwxyz",
@@ -2174,6 +2292,41 @@ def test_client_retry_wait_is_clamped_to_command_deadline(
 
 
 @ROUTE_CTX
+def test_client_maintenance_response_is_not_retried(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("polygres_cli.cli_client.time.sleep", sleeps.append)
+    route = _stub(
+        respx.get(f"{API_BASE_URL}/projects"),
+        return_value=httpx.Response(
+            503,
+            json={
+                "request_id": "req_maintenance",
+                "error": {
+                    "code": "MAINTENANCE_FULL",
+                    "message": "Database upgrades are in progress.",
+                    "details": {"mode": "full"},
+                },
+            },
+        ),
+    )
+    client = CliControlPlaneClient(
+        base_url=API_BASE_URL,
+        access_token=ACCESS_TOKEN,
+        max_retries=2,
+    )
+
+    with client, pytest.raises(cli.CliError) as exc:
+        client.list_projects()
+
+    assert route.call_count == 1
+    assert sleeps == []
+    assert exc.value.code == "MAINTENANCE_FULL"
+    assert exc.value.message == "Database upgrades are in progress."
+
+
+@ROUTE_CTX
 def test_graph_discover_normalizes_real_backend_discovery_to_applyable_configuration(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -2355,11 +2508,11 @@ def test_graph_export_round_trip_strips_read_only_record_fields_on_apply(
     assert set(sent["registered_tables"][0]) == {
         "schema",
         "table",
-        "id_column",
         "id_columns",
         "columns",
         "tenant_column",
     }
+    assert sent["registered_tables"][0]["id_columns"] == ["id"]
     assert json.loads(out)["configuration"]["build_status"] == "ready"
 
 
@@ -2390,6 +2543,86 @@ def test_graph_build_normalizes_runtime_operation_string(
         "build_started": True,
         "build_completed": True,
     }
+
+
+@ROUTE_CTX
+def test_graph_build_never_claims_a_concurrent_build_completed_while_building(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub(
+        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/graph/build"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_build",
+                "configuration": {"build_status": "building", "needs_rebuild": True},
+                "operation": "completed",
+            },
+        ),
+    )
+
+    rc, out, err = run_cli(["--json", "graph", "build"], capsys, monkeypatch, tmp_path)
+
+    assert rc == 0
+    assert err == ""
+    assert json.loads(out)["operation"] == {
+        "build_started": True,
+        "build_completed": False,
+    }
+
+
+@ROUTE_CTX
+def test_graph_status_shows_bounded_failure_diagnostics_in_human_output(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    differences = [
+        {
+            "field": f"registered_tables[public.table_{index}]",
+            "expected": "configured",
+            "actual": "missing",
+            "reason": "missing",
+        }
+        for index in range(6)
+    ]
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/graph/status"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_status",
+                "status": {
+                    "build_status": "failed",
+                    "ready": False,
+                    "needs_rebuild": True,
+                    "invalid_reason": "activation_failed",
+                    "reason": "definition_mismatch",
+                    "differences": differences,
+                },
+            },
+        ),
+    )
+
+    rc, human, err = run_cli(["graph", "status"], capsys, monkeypatch, tmp_path)
+    json_rc, structured, json_err = run_cli(
+        ["--json", "graph", "status"], capsys, monkeypatch, tmp_path
+    )
+
+    assert rc == 0
+    assert err == ""
+    assert "Graph        failed" in human
+    assert "Reason       activation_failed" in human
+    assert "registered_tables[public.table_0] (missing)" in human
+    assert "registered_tables[public.table_4] (missing)" in human
+    assert "registered_tables[public.table_5]" not in human
+    assert json_rc == 0
+    assert json_err == ""
+    assert json.loads(structured)["graph"]["differences"] == differences
 
 
 @ROUTE_CTX
@@ -2545,14 +2778,21 @@ def test_env_removes_backend_password_placeholder_in_human_and_json_output(
     assert "<password>" not in human
     assert "[REDACTED]" not in human
     assert "postgresql://project_owner@" in human
+    assert (
+        f"export POLYGRES_RUNTIME_URL=https://{PROJECT_ID}.api.db.polygres.com/v1" in human
+    )
 
     rc, machine, err = run_cli(["--json", "env"], capsys, monkeypatch, tmp_path)
     assert rc == 0
     assert err == ""
-    rendered = json.dumps(json.loads(machine)["env"])
+    machine_env = json.loads(machine)["env"]
+    rendered = json.dumps(machine_env)
     assert "<password>" not in rendered
     assert "[REDACTED]" not in rendered
     assert "postgresql://project_owner@" in rendered
+    assert machine_env["POLYGRES_RUNTIME_URL"] == (
+        f"https://{PROJECT_ID}.api.db.polygres.com/v1"
+    )
 
 
 @ROUTE_CTX
@@ -2651,9 +2891,9 @@ def test_malformed_refresh_response_clears_stored_auth(
         ["--json", "projects", "list"], capsys, monkeypatch, tmp_path, token=None
     )
 
-    assert rc == 3
+    assert rc == 8
     assert err == ""
-    assert json.loads(out)["error"]["code"] == "AUTH_REFRESH_INVALID"
+    assert json.loads(out)["error"]["code"] == "CLI_AUTH_RESPONSE_INVALID"
     assert "auth" not in selected_config(tmp_path)
 
 
@@ -2732,7 +2972,41 @@ def test_login_start_response_requires_a_nonempty_poll_token(payload: dict[str, 
     with pytest.raises(cli.CliError) as exc_info:
         validate_start_response(payload)
 
-    assert exc_info.value.code == "AUTH_RESPONSE_INVALID"
+    assert exc_info.value.code == "CLI_AUTH_RESPONSE_INVALID"
+
+
+def test_canonical_poll_response_uses_shared_dto_and_normalizes_storage() -> None:
+    payload = normalize_poll_response(
+        {
+            "request_id": "req_cli_poll",
+            "result": {
+                "state": "approved",
+                "token_pair": {
+                    "access_token": ACCESS_TOKEN,
+                    "refresh_token": REFRESH_TOKEN,
+                    "access_expires_at": "2099-07-08T13:00:00Z",
+                    "refresh_expires_at": "2099-08-08T13:00:00Z",
+                    "user": {
+                        "subject_id": "123e4567-e89b-12d3-a456-426614174000",
+                        "email": "user@example.test",
+                    },
+                },
+            },
+        }
+    )
+
+    assert payload == {
+        "request_id": "req_cli_poll",
+        "status": "approved",
+        "access_token": ACCESS_TOKEN,
+        "refresh_token": REFRESH_TOKEN,
+        "access_expires_at": "2099-07-08T13:00:00+00:00",
+        "refresh_expires_at": "2099-08-08T13:00:00+00:00",
+        "user": {
+            "subject_id": "123e4567-e89b-12d3-a456-426614174000",
+            "email": "user@example.test",
+        },
+    }
 
 
 def test_poll_token_is_redacted_from_nested_cli_payloads() -> None:

@@ -15,9 +15,37 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from polygres_cli._vendor.polygres_lib.context import (
+    CollectionCreateRequest,
+    CollectionUpdateRequest,
+    ContextJointResponse,
+    CountRequest,
+    DenseSearchRequest,
+    DiscoveryRequest,
+    FacetsRequest,
+    FilterColumnRequest,
+    FilterJsonbPathRequest,
+    GraphFirstSearchRequest,
+    GroupedSearchRequest,
+    JointSearchRequest,
+    PointKeysRequest,
+    RankFusionSearchRequest,
+    RecallCheckRequest,
+    TextHybridSearchRequest,
+    VectorFirstSearchRequest,
+)
+from polygres_cli.api_openapi import (
+    HTTP_METHODS,
+    api_route_rows,
+    build_api_request_plan,
+    inspect_api_operation,
+    parse_json_body,
+    resolve_api_operation,
+)
 from polygres_cli.cli_auth import clear_auth, validate_start_response, validated_approved_auth
 from polygres_cli.cli_client import VERSION, CliControlPlaneClient
 from polygres_cli.cli_config import (
+    DEFAULT_API_BASE_URL,
     ConfigStore,
     access_token,
     env_access_token_set,
@@ -25,7 +53,6 @@ from polygres_cli.cli_config import (
     resolve_api_base_url,
 )
 from polygres_cli.cli_errors import (
-    AUTH,
     CONFLICT,
     GENERAL_FAILURE,
     LOCAL_DEPENDENCY,
@@ -35,9 +62,53 @@ from polygres_cli.cli_errors import (
     USAGE,
     CliError,
     UsageError,
+    auth_failure,
 )
+from polygres_cli.cli_notices import display_notices_safely
 from polygres_cli.cli_output import print_kv, print_table, write_error, write_json
 from polygres_cli.cli_secrets import redact
+from polygres_cli.context_inputs import (
+    context_deduplicate,
+    context_finite_number,
+    context_idempotency_key,
+    context_model_payload,
+    context_parse_jsonb_filters,
+    context_read_array,
+    context_read_object,
+    context_response_model,
+    context_validate_embedding,
+    context_validate_filter,
+    context_validate_identifier,
+    context_validate_joint_weights,
+    context_validate_recall,
+    context_validate_source_keys,
+    context_validate_uuid,
+    context_validate_weights,
+)
+from polygres_cli.context_output import (
+    context_capabilities_human,
+    context_collection_get_human,
+    context_collection_status_human,
+    context_collections_list_human,
+    context_count_human,
+    context_deletion_plan_human,
+    context_diagnostics_human,
+    context_discovery_human,
+    context_facets_human,
+    context_filters_human,
+    context_joint_human,
+    context_operation_human,
+    context_operations_list_human,
+    context_point_mutation_human,
+    context_point_status_human,
+    context_points_scroll_human,
+    context_preflight_human,
+    context_ranked_human,
+    context_recall_human,
+    context_verification_human,
+    context_wait_progress,
+)
+from polygres_cli.context_wait import context_wait_for_operation
 
 PROJECT_ID_RE = re.compile(r"^p[a-z0-9]{23}$")
 UUID_LIKE_RE = re.compile(
@@ -78,13 +149,17 @@ def main(argv: list[str] | None = None) -> int:
         args = parser.parse_args(argv)
         if getattr(args, "version", False):
             sys.stdout.write(f"polygres {VERSION}\n")
+            _display_post_command_notices(force_refresh=True)
             return SUCCESS
         if not hasattr(args, "func"):
             parser.print_help()
             return SUCCESS
         ctx = _context(args)
         with ctx.client:
-            return int(args.func(ctx, args))
+            result = int(args.func(ctx, args))
+        if result == SUCCESS and args.resource != "notices":
+            _display_post_command_notices(base_url=resolve_api_base_url(ctx.config))
+        return result
     except SystemExit as exc:
         return int(exc.code or SUCCESS)
     except CliError as exc:
@@ -113,6 +188,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_vector_parsers(subparsers)
     _add_text_parsers(subparsers)
     _add_ready_parser(subparsers)
+    _add_notices_parser(subparsers)
+    _add_api_parsers(subparsers)
+    _add_context_parsers(subparsers)
     _add_config_parsers(subparsers)
     return parser
 
@@ -150,13 +228,7 @@ class Context:
         self.store.save(self.config)
 
     def store_refreshed_auth(self, payload: dict[str, Any]) -> None:
-        user = payload.get("user")
-        self.config["auth"] = {
-            "access_token": payload["access_token"],
-            "refresh_token": payload["refresh_token"],
-            "expires_at": payload.get("expires_at"),
-            "user": user if isinstance(user, dict) else {},
-        }
+        self.config["auth"] = validated_approved_auth(payload)
         self.save()
 
     def clear_stored_auth(self) -> None:
@@ -301,6 +373,9 @@ def _add_vector_parsers(subparsers: argparse._SubParsersAction[argparse.Argument
     delete.add_argument("config_id")
     delete.add_argument("--yes", action="store_true")
     delete.set_defaults(func=handle_vector_configs_delete)
+    set_default = configs_sub.add_parser("set-default", help="set the default vector configuration")
+    set_default.add_argument("config_id")
+    set_default.set_defaults(func=handle_vector_configs_set_default)
     reindex = sub.add_parser("reindex", help="reindex vector configuration")
     reindex.add_argument("config_id")
     reindex.set_defaults(func=handle_vector_reindex)
@@ -346,6 +421,335 @@ def _add_text_parsers(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
 def _add_ready_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("ready", help="show retrieval readiness")
     parser.set_defaults(func=handle_ready)
+
+
+def _add_notices_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser("notices", help="refresh and display active CLI notices")
+    parser.set_defaults(func=handle_notices)
+
+
+def _add_api_parsers(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser("api", help="inspect and call bundled API routes")
+    sub = parser.add_subparsers(dest="api_action", required=True)
+
+    routes = sub.add_parser("routes", help="list routes in the bundled OpenAPI snapshot")
+    routes.add_argument("--method", type=str.upper, choices=HTTP_METHODS)
+    routes.set_defaults(func=handle_api_routes)
+
+    request = sub.add_parser("request", help="execute a bundled OpenAPI route")
+    request.add_argument("route", help="OpenAPI path template or operationId")
+    request.add_argument("--method", type=str.upper, choices=HTTP_METHODS)
+    request.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="[LOCATION:]NAME=VALUE",
+        help="declared path, query, or header parameter; repeat for arrays",
+    )
+    body = request.add_mutually_exclusive_group()
+    body.add_argument("--body", help="inline JSON request body")
+    body.add_argument("--body-file", help="UTF-8 JSON file, or - for standard input")
+    request.add_argument("--schema", action="store_true", help="inspect route schema only")
+    request.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="validate and print without calling",
+    )
+    request.set_defaults(func=handle_api_request)
+
+
+def _add_context_parsers(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser("context", help="manage pgContext AI Search")
+    sub = parser.add_subparsers(dest="context_action", required=True)
+
+    capabilities = sub.add_parser("capabilities", help="inspect Context capabilities")
+    capabilities.set_defaults(func=handle_context_capabilities)
+
+    sources = sub.add_parser("sources", help="discover and preflight Context sources")
+    sources_sub = sources.add_subparsers(dest="sources_action", required=True)
+    discover = sources_sub.add_parser("discover", help="discover Context sources")
+    discover.add_argument("--schema", action="append", default=[])
+    discover.set_defaults(func=handle_context_sources_discover)
+    preflight = sources_sub.add_parser("preflight", help="preflight a collection request")
+    preflight.add_argument("--file", required=True)
+    preflight.set_defaults(func=handle_context_sources_preflight)
+
+    collections = sub.add_parser("collections", help="manage Context collections")
+    collections_sub = collections.add_subparsers(dest="collections_action", required=True)
+    list_parser = collections_sub.add_parser("list", help="list Context collections")
+    list_parser.add_argument("--status", choices=["ready", "stale", "failed", "deleting"])
+    list_parser.add_argument("--limit", type=_context_admin_limit, default=50)
+    list_parser.add_argument("--cursor")
+    list_parser.set_defaults(func=handle_context_collections_list)
+    get = collections_sub.add_parser("get", help="show a Context collection")
+    get.add_argument("collection_id")
+    get.set_defaults(func=handle_context_collections_get)
+    status = collections_sub.add_parser("status", help="show cheap collection status")
+    status.add_argument("collection_id")
+    status.set_defaults(func=handle_context_collections_status)
+    verify = collections_sub.add_parser("verify", help="actively verify a collection")
+    verify.add_argument("collection_id")
+    verify.set_defaults(func=handle_context_collections_verify)
+    create = collections_sub.add_parser("create", help="create a Context collection")
+    create.add_argument("name")
+    create.add_argument("--file")
+    create.add_argument("--source", choices=["existing", "add-column", "new-table"])
+    create.add_argument("--schema")
+    create.add_argument("--table")
+    create.add_argument("--source-key-column")
+    create.add_argument("--vector-column")
+    create.add_argument("--content-column")
+    create.add_argument("--metadata-column")
+    create.add_argument("--dimensions", type=_context_dimensions)
+    create.add_argument("--metric", choices=["cosine", "inner_product", "l2", "l1"])
+    create.add_argument("--text-column")
+    create.add_argument("--result-column", action="append", default=[])
+    create.add_argument("--filter-column", action="append", default=[])
+    create.add_argument("--jsonb-filter", action="append", default=[])
+    create.add_argument("--index-kind", choices=["hnsw", "none"])
+    create.add_argument("--max-search-limit", type=_context_ranked_limit)
+    _add_context_operation_flags(create)
+    create.set_defaults(func=handle_context_collections_create)
+    update = collections_sub.add_parser("update", help="update collection configuration")
+    update.add_argument("collection_id")
+    text_group = update.add_mutually_exclusive_group()
+    text_group.add_argument("--text-column")
+    text_group.add_argument("--clear-text-column", action="store_true")
+    update.add_argument("--result-column", action="append", default=[])
+    update.add_argument("--clear-result-columns", action="store_true")
+    update.add_argument("--max-search-limit", type=_context_ranked_limit)
+    _add_context_operation_flags(update)
+    update.set_defaults(func=handle_context_collections_update)
+    set_default = collections_sub.add_parser(
+        "set-default", help="set the default Context collection"
+    )
+    set_default.add_argument("collection_id")
+    _add_context_operation_flags(set_default)
+    set_default.set_defaults(func=handle_context_collections_set_default)
+    diagnostics = collections_sub.add_parser("diagnostics", help="inspect collection diagnostics")
+    diagnostics.add_argument("collection_id")
+    diagnostics.set_defaults(func=handle_context_collections_diagnostics)
+    reindex = collections_sub.add_parser("reindex", help="rebuild the Context HNSW index")
+    reindex.add_argument("collection_id")
+    _add_context_operation_flags(reindex)
+    reindex.set_defaults(func=handle_context_collections_reindex)
+    delete = collections_sub.add_parser("delete", help="delete a Context collection")
+    delete.add_argument("collection_id")
+    delete.add_argument("--yes", action="store_true")
+    _add_context_operation_flags(delete)
+    delete.set_defaults(func=handle_context_collections_delete)
+
+    filters = sub.add_parser("filters", help="manage registered Context filters")
+    filters_sub = filters.add_subparsers(dest="filters_action", required=True)
+    filters_list = filters_sub.add_parser("list", help="list registered filters")
+    filters_list.add_argument("collection_id")
+    filters_list.set_defaults(func=handle_context_filters_list)
+    add_column = filters_sub.add_parser("add-column", help="register a column filter")
+    add_column.add_argument("collection_id")
+    add_column.add_argument("--key", required=True)
+    add_column.add_argument("--column", required=True)
+    _add_context_operation_flags(add_column)
+    add_column.set_defaults(func=handle_context_filters_add_column)
+    add_jsonb = filters_sub.add_parser("add-jsonb-path", help="register a JSONB path filter")
+    add_jsonb.add_argument("collection_id")
+    add_jsonb.add_argument("--key", required=True)
+    add_jsonb.add_argument("--column", required=True)
+    add_jsonb.add_argument("--path", action="append", required=True)
+    _add_context_operation_flags(add_jsonb)
+    add_jsonb.set_defaults(func=handle_context_filters_add_jsonb_path)
+
+    points = sub.add_parser("points", help="manage Context point mappings")
+    points_sub = points.add_subparsers(dest="points_action", required=True)
+    for action, handler in (
+        ("upsert", handle_context_points_upsert),
+        ("delete", handle_context_points_delete),
+    ):
+        command = points_sub.add_parser(action, help=f"{action} Context point mappings")
+        command.add_argument("collection_id")
+        command.add_argument("source_key", nargs="+")
+        _add_context_operation_flags(command)
+        command.set_defaults(func=handler)
+    point_status = points_sub.add_parser("status", help="show point reconciliation status")
+    point_status.add_argument("collection_id")
+    point_status.set_defaults(func=handle_context_points_status)
+    reconcile = points_sub.add_parser("reconcile", help="fully reconcile Context points")
+    reconcile.add_argument("collection_id")
+    _add_context_operation_flags(reconcile)
+    reconcile.set_defaults(func=handle_context_points_reconcile)
+    scroll = points_sub.add_parser("scroll", help="scroll active Context point mappings")
+    scroll.add_argument("collection_id")
+    scroll.add_argument("--limit", type=_context_admin_limit, default=50)
+    scroll.add_argument("--cursor")
+    scroll.set_defaults(func=handle_context_points_scroll)
+
+    operations = sub.add_parser("operations", help="inspect durable Context operations")
+    operations_sub = operations.add_subparsers(dest="operations_action", required=True)
+    operations_list = operations_sub.add_parser("list", help="list Context operations")
+    operations_list.add_argument("--collection-id")
+    operations_list.add_argument(
+        "--kind",
+        choices=[
+            "collection_create",
+            "collection_update",
+            "collection_set_default",
+            "collection_delete",
+            "collection_reindex",
+            "filter_add_column",
+            "filter_add_jsonb_path",
+            "points_upsert",
+            "points_delete",
+            "points_reconcile",
+        ],
+    )
+    operations_list.add_argument(
+        "--status",
+        choices=["queued", "running", "cancel_requested", "succeeded", "failed", "cancelled"],
+    )
+    operations_list.add_argument("--limit", type=_context_admin_limit, default=50)
+    operations_list.add_argument("--cursor")
+    operations_list.set_defaults(func=handle_context_operations_list)
+    operation_get = operations_sub.add_parser("get", help="show a Context operation")
+    operation_get.add_argument("operation_id")
+    operation_get.set_defaults(func=handle_context_operations_get)
+    operation_wait = operations_sub.add_parser("wait", help="wait for a Context operation")
+    operation_wait.add_argument("operation_id")
+    operation_wait.add_argument("--timeout", type=_timeout_seconds, default=1800)
+    operation_wait.add_argument("--poll-interval", type=_context_poll_interval_arg)
+    operation_wait.set_defaults(func=handle_context_operations_wait)
+    operation_cancel = operations_sub.add_parser("cancel", help="cancel a Context operation")
+    operation_cancel.add_argument("operation_id")
+    _add_context_operation_flags(operation_cancel)
+    operation_cancel.set_defaults(func=handle_context_operations_cancel)
+    operation_retry = operations_sub.add_parser("retry", help="retry a Context operation")
+    operation_retry.add_argument("operation_id")
+    _add_context_operation_flags(operation_retry)
+    operation_retry.set_defaults(func=handle_context_operations_retry)
+
+    count = sub.add_parser("count", help="count visible active Context points")
+    count.add_argument("collection")
+    _add_context_filter_flags(count)
+    count.set_defaults(func=handle_context_count)
+    facets = sub.add_parser("facets", help="aggregate a registered Context filter")
+    facets.add_argument("collection")
+    facets.add_argument("field")
+    _add_context_filter_flags(facets)
+    facets.add_argument("--limit", type=_context_ranked_limit, default=10)
+    facets.set_defaults(func=handle_context_facets)
+
+    dense = sub.add_parser("search", help="run dense Context retrieval")
+    dense.add_argument("collection")
+    _add_context_ranked_flags(dense, filters=True)
+    dense.set_defaults(func=handle_context_search)
+    text = sub.add_parser("text-hybrid", help="run dense plus text Context retrieval")
+    text.add_argument("collection")
+    text.add_argument("--query")
+    _add_context_ranked_flags(text)
+    text.set_defaults(func=handle_context_text_hybrid)
+    graph_first = sub.add_parser("graph-first", help="rank a graph neighborhood with Context")
+    graph_first.add_argument("collection")
+    _add_context_graph_flags(graph_first, start=True, filters=True)
+    graph_first.set_defaults(func=handle_context_graph_first)
+    vector_first = sub.add_parser("vector-first", help="enrich Context hits with graph evidence")
+    vector_first.add_argument("collection")
+    _add_context_graph_flags(vector_first, context_limit=True, filters=True)
+    vector_first.set_defaults(func=handle_context_vector_first)
+    rank_fusion = sub.add_parser("rank-fusion", help="fuse independent Context and graph rankings")
+    rank_fusion.add_argument("collection")
+    _add_context_graph_flags(
+        rank_fusion,
+        start=True,
+        context_limit=True,
+        weights=True,
+        filters=True,
+    )
+    rank_fusion.set_defaults(func=handle_context_rank_fusion)
+    joint = sub.add_parser("joint", help="run coupled Context and graph retrieval")
+    joint.add_argument("collection")
+    _add_context_joint_flags(joint)
+    joint.set_defaults(func=handle_context_joint)
+    grouped = sub.add_parser("grouped-search", help="group dense Context results")
+    grouped.add_argument("collection")
+    grouped.add_argument("--group-by")
+    grouped.add_argument("--group-limit", type=_context_ranked_limit)
+    _add_context_ranked_flags(grouped)
+    grouped.set_defaults(func=handle_context_grouped_search)
+    recall = sub.add_parser("recall-check", help="compare HNSW results with exact retrieval")
+    recall.add_argument("collection")
+    recall.add_argument("--minimum-recall", type=_context_finite_float)
+    _add_context_ranked_flags(recall, filters=True)
+    recall.set_defaults(func=handle_context_recall_check)
+
+
+def _add_context_operation_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--no-wait", action="store_true")
+    parser.add_argument("--timeout", type=_timeout_seconds, default=1800)
+    parser.add_argument("--idempotency-key")
+
+
+def _add_context_filter_flags(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--filter-json")
+    group.add_argument("--filter-file")
+
+
+def _add_context_ranked_flags(
+    parser: argparse.ArgumentParser,
+    *,
+    filters: bool = False,
+) -> None:
+    parser.add_argument("--request")
+    embedding = parser.add_mutually_exclusive_group()
+    embedding.add_argument("--embedding-json")
+    embedding.add_argument("--embedding-file")
+    parser.add_argument("--limit", type=_context_ranked_limit)
+    if filters:
+        _add_context_filter_flags(parser)
+
+
+def _add_context_graph_flags(
+    parser: argparse.ArgumentParser,
+    *,
+    start: bool = False,
+    context_limit: bool = False,
+    weights: bool = False,
+    filters: bool = False,
+) -> None:
+    if start:
+        parser.add_argument("--start-schema")
+        parser.add_argument("--start-table")
+        parser.add_argument("--start-id")
+    if context_limit:
+        parser.add_argument("--context-limit", type=_context_ranked_limit)
+    parser.add_argument("--max-depth", type=_context_graph_depth)
+    parser.add_argument("--graph-limit", type=_context_ranked_limit)
+    parser.add_argument("--relationship-type", action="append", default=[])
+    parser.add_argument("--direction", choices=["out", "in", "any", "both"])
+    if weights:
+        parser.add_argument("--context-weight", type=_context_finite_float)
+        parser.add_argument("--graph-weight", type=_context_finite_float)
+    _add_context_ranked_flags(parser, filters=filters)
+
+
+def _add_context_joint_flags(parser: argparse.ArgumentParser) -> None:
+    _add_context_ranked_flags(parser, filters=True)
+    parser.add_argument("--query")
+    parser.add_argument("--start-json", action="append", default=[])
+    parser.add_argument("--context-limit", type=_context_ranked_limit)
+    parser.add_argument("--seed-limit", type=_context_joint_seed_limit)
+    parser.add_argument("--max-depth", type=_context_graph_depth)
+    parser.add_argument("--graph-limit", type=_context_ranked_limit)
+    parser.add_argument("--traversal-limit", type=_context_ranked_limit)
+    parser.add_argument("--relationship-type", action="append", default=[])
+    parser.add_argument("--direction", choices=["out", "in", "any", "both"])
+    parser.add_argument("--semantic-weight", type=_context_finite_float)
+    parser.add_argument("--lexical-weight", type=_context_finite_float)
+    parser.add_argument("--graph-weight", type=_context_finite_float)
 
 
 def _add_config_parsers(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -401,23 +805,13 @@ def handle_login(ctx: Context, args: argparse.Namespace) -> int:
                 sys.stdout.write(f"Signed in as {user.get('email') or user.get('id') or 'user'}.\n")
             return SUCCESS
         if status == "denied":
-            raise CliError("AUTH_DENIED", "Sign-in was denied.", exit_code=AUTH)
+            raise auth_failure("CLI_AUTH_DENIED")
         if status == "expired":
-            raise CliError("AUTH_EXPIRED", "Sign-in session expired.", exit_code=AUTH)
-        raise CliError(
-            "AUTH_RESPONSE_INVALID",
-            "Authentication poll returned an unknown status.",
-            exit_code=AUTH,
-            details={"status": status},
-        )
+            raise auth_failure("CLI_AUTH_EXPIRED")
+        raise auth_failure("CLI_AUTH_RESPONSE_INVALID", details={"status": status})
     if expires_at <= datetime.now(timezone.utc):
-        raise CliError("AUTH_EXPIRED", "Sign-in session expired.", exit_code=AUTH)
-    raise CliError(
-        "AUTH_TIMEOUT",
-        "Timed out waiting for sign-in approval.",
-        exit_code=UNAVAILABLE,
-        details={"status": status, "expires_at": started.get("expires_at")},
-    )
+        raise auth_failure("CLI_AUTH_EXPIRED")
+    raise auth_failure("CLI_AUTH_TIMEOUT")
 
 
 def handle_logout(ctx: Context, args: argparse.Namespace) -> int:
@@ -493,9 +887,7 @@ def handle_projects_use(ctx: Context, args: argparse.Namespace) -> int:
     if ctx.json:
         write_json(output)
     elif not ctx.quiet:
-        sys.stdout.write(
-            f"Selected project: {project.get('name', project_id)} ({project_id})\n"
-        )
+        sys.stdout.write(f"Selected project: {project.get('name', project_id)} ({project_id})\n")
     return SUCCESS
 
 
@@ -725,9 +1117,7 @@ def handle_migrations_apply(ctx: Context, args: argparse.Namespace) -> int:
     create_operation = (
         created.get("operation") if isinstance(created.get("operation"), dict) else {}
     )
-    apply_operation = (
-        applied.get("operation") if isinstance(applied.get("operation"), dict) else {}
-    )
+    apply_operation = applied.get("operation") if isinstance(applied.get("operation"), dict) else {}
     status = applied_migration.get("status")
     output = {
         "migration": applied_migration,
@@ -781,12 +1171,13 @@ def handle_graph_build(ctx: Context, args: argparse.Namespace) -> int:
     project_id = _resolve_project_id(ctx, None)
     payload = ctx.client.graph_build(project_id)
     operation = payload.get("operation")
+    build_status = payload.get("build_status") or payload.get("configuration", {}).get(
+        "build_status"
+    )
     if not isinstance(operation, dict):
         operation = {
             "build_started": True,
-            "build_completed": operation == "completed"
-            or payload.get("build_status") == "ready"
-            or payload.get("configuration", {}).get("build_status") == "ready",
+            "build_completed": build_status == "ready",
         }
     output = {
         "graph": payload.get("graph", payload.get("configuration", {})),
@@ -800,10 +1191,17 @@ def handle_graph_status(ctx: Context, args: argparse.Namespace) -> int:
     project_id = _resolve_project_id(ctx, None)
     payload = ctx.client.graph_status(project_id)
     graph = payload.get("graph") or payload.get("status") or {}
+    human_items: list[tuple[str, Any]] = [("Graph", graph.get("build_status", ""))]
+    reason = graph.get("invalid_reason") or graph.get("reason")
+    if reason:
+        human_items.append(("Reason", str(reason)[:160]))
+    difference_summary = _graph_difference_summary(graph.get("differences"))
+    if difference_summary:
+        human_items.append(("Differences", difference_summary))
     return _emit(
         ctx,
         {"graph": graph, "request_id": payload.get("request_id")},
-        [("Graph", graph.get("build_status", ""))],
+        human_items,
     )
 
 
@@ -819,7 +1217,15 @@ def handle_vector_configs_list(ctx: Context, args: argparse.Namespace) -> int:
     elif not ctx.quiet:
         print_table(
             output["configurations"],
-            ["id", "name", "index_status", "dimensions", "metric"],
+            [
+                "id",
+                "name",
+                "is_default",
+                "index_status",
+                "index_error",
+                "dimensions",
+                "metric",
+            ],
         )
     return SUCCESS
 
@@ -850,6 +1256,13 @@ def handle_vector_configs_delete(ctx: Context, args: argparse.Namespace) -> int:
     project_id = _resolve_project_id(ctx, None)
     response = ctx.client.delete_vector_configuration(project_id, args.config_id)
     return _emit_config_response(ctx, response, default_operation={"deleted": True})
+
+
+def handle_vector_configs_set_default(ctx: Context, args: argparse.Namespace) -> int:
+    _validate_uuid(args.config_id, "configuration ID")
+    project_id = _resolve_project_id(ctx, None)
+    response = ctx.client.set_default_vector_configuration(project_id, args.config_id)
+    return _emit_config_response(ctx, response, default_operation={"default_set": True})
 
 
 def handle_vector_reindex(ctx: Context, args: argparse.Namespace) -> int:
@@ -917,7 +1330,11 @@ def handle_text_create_tsvector(ctx: Context, args: argparse.Namespace) -> int:
                 str(
                     migration.get("error_message")
                     if isinstance(migration, dict)
-                    else "Generated-column migration failed."
+                    else (
+                        "The API did not return the generated-column migration result. Run "
+                        "`polygres migrations list` to inspect the migration; contact support "
+                        "with the request ID if the result is still missing."
+                    )
                 ),
                 request_id=applied.get("request_id"),
             )
@@ -1013,11 +1430,25 @@ def handle_import_csv(ctx: Context, args: argparse.Namespace) -> int:
     preview_payload = preview.get("preview") if isinstance(preview.get("preview"), dict) else {}
     job_id = preview_payload.get("job_id")
     if not isinstance(job_id, str):
-        raise CliError("IMPORT_INVALID", "CSV preview response did not include a job ID.")
+        raise CliError(
+            "IMPORT_INVALID",
+            "The API returned an incomplete CSV preview. Retry the import. "
+            "If it happens again, contact support.",
+            request_id=(
+                str(preview.get("request_id")) if preview.get("request_id") else None
+            ),
+        )
     _validate_response_uuid(job_id, "import preview job")
     columns = preview_payload.get("columns")
     if not isinstance(columns, list):
-        raise CliError("IMPORT_INVALID", "CSV preview response did not include columns.")
+        raise CliError(
+            "IMPORT_INVALID",
+            "The API returned an incomplete CSV preview. Retry the import. "
+            "If it happens again, contact support.",
+            request_id=(
+                str(preview.get("request_id")) if preview.get("request_id") else None
+            ),
+        )
     import_fields: dict[str, object] = {
         "target_schema": args.schema,
         "target_table": args.table,
@@ -1098,6 +1529,528 @@ def handle_ready(ctx: Context, args: argparse.Namespace) -> int:
     )
 
 
+def handle_api_routes(ctx: Context, args: argparse.Namespace) -> int:
+    rows = api_route_rows(method=args.method)
+    if ctx.json:
+        write_json({"routes": rows})
+    elif not ctx.quiet:
+        print_table(rows, ["method", "route", "operation_id", "summary"])
+    return SUCCESS
+
+
+def handle_api_request(ctx: Context, args: argparse.Namespace) -> int:
+    operation = resolve_api_operation(args.route, method=args.method)
+    if args.schema:
+        if args.param or args.body is not None or args.body_file is not None or args.dry_run:
+            raise UsageError(
+                "--schema cannot be combined with request parameters, a body, or --dry-run.",
+                code="INVALID_USAGE",
+            )
+        return _emit_api_payload(ctx, inspect_api_operation(operation))
+
+    body, body_provided = _api_request_body(args)
+    default_project_id: str | None = None
+    has_explicit_project_parameter = any(
+        raw.split("=", 1)[0] in {"project_id", "path:project_id"}
+        for raw in args.param
+        if "=" in raw
+    )
+    route_uses_project = any(
+        parameter.get("in") == "path" and parameter.get("name") == "project_id"
+        for parameter in inspect_api_operation(operation)["parameters"]
+    )
+    if route_uses_project and not has_explicit_project_parameter:
+        if args.project and PROJECT_ID_RE.fullmatch(args.project):
+            default_project_id = args.project
+        elif ctx.selected_project_id:
+            default_project_id = ctx.selected_project_id
+        elif not args.dry_run:
+            default_project_id = _resolve_project_id(ctx, None)
+        elif args.project:
+            raise UsageError(
+                "--dry-run cannot resolve a project name. Pass a project ID with "
+                "--project or --param path:project_id=...",
+                code="API_PARAMETER_REQUIRED",
+            )
+
+    plan = build_api_request_plan(
+        operation,
+        args.param,
+        body=body,
+        body_provided=body_provided,
+        default_project_id=default_project_id,
+    )
+    if args.dry_run:
+        return _emit_api_payload(ctx, {"dry_run": True, "request": plan.output()})
+    return _emit_api_payload(ctx, ctx.client.api_request(plan))
+
+
+def _api_request_body(args: argparse.Namespace) -> tuple[Any, bool]:
+    if args.body is not None:
+        return parse_json_body(args.body, source="--body"), True
+    if args.body_file is None:
+        return None, False
+    if args.body_file == "-":
+        try:
+            raw = sys.stdin.read()
+        except OSError as exc:
+            raise UsageError(
+                "Could not read the JSON request body from standard input.",
+                code="API_BODY_INVALID",
+            ) from exc
+        return parse_json_body(raw, source="standard input"), True
+    path = _readable_file(args.body_file)
+    return parse_json_body(_read_text_file(path), source=str(path)), True
+
+
+def _emit_api_payload(ctx: Context, payload: Any) -> int:
+    if ctx.json:
+        write_json(payload)
+    elif not ctx.quiet:
+        sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    return SUCCESS
+
+
+def handle_context_capabilities(ctx: Context, args: argparse.Namespace) -> int:
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_capabilities(project_id)
+    return _context_emit(ctx, payload, context_capabilities_human)
+
+
+def handle_context_sources_discover(ctx: Context, args: argparse.Namespace) -> int:
+    schemas = context_deduplicate(args.schema)
+    for index, schema in enumerate(schemas):
+        context_validate_identifier(schema, field=f"schema_names.{index}")
+    request = context_model_payload(
+        DiscoveryRequest,
+        {"schema_names": schemas} if schemas else {},
+        exclude_unset=True,
+    )
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_discover(project_id, request)
+    return _context_emit(ctx, payload, context_discovery_human)
+
+
+def handle_context_sources_preflight(ctx: Context, args: argparse.Namespace) -> int:
+    request = context_read_object(args.file, file_input=True, allow_stdin=True)
+    request = context_model_payload(CollectionCreateRequest, request)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_preflight(project_id, request)
+    return _context_emit(
+        ctx,
+        payload,
+        context_preflight_human,
+        quiet=ctx.quiet,
+    )
+
+
+def handle_context_collections_list(ctx: Context, args: argparse.Namespace) -> int:
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_list(
+        project_id,
+        status=args.status,
+        limit=args.limit,
+        cursor=args.cursor,
+    )
+    return _context_emit(ctx, payload, context_collections_list_human)
+
+
+def handle_context_collections_get(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_get(project_id, args.collection_id)
+    return _context_emit(ctx, payload, context_collection_get_human)
+
+
+def handle_context_collections_status(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_status(project_id, args.collection_id)
+    return _context_emit(ctx, payload, context_collection_status_human)
+
+
+def handle_context_collections_verify(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_verify(project_id, args.collection_id)
+    return _context_emit(ctx, payload, context_verification_human)
+
+
+def handle_context_collections_create(ctx: Context, args: argparse.Namespace) -> int:
+    request = _context_collection_create_request(args)
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_create(
+        project_id,
+        request,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_collections_update(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    if args.clear_result_columns and args.result_column:
+        raise CliError(
+            "CONTEXT_REQUEST_INVALID",
+            "--clear-result-columns cannot be combined with --result-column.",
+            exit_code=USAGE,
+        )
+    request: dict[str, Any] = {}
+    if args.clear_text_column:
+        request["text_column"] = None
+    elif args.text_column is not None:
+        request["text_column"] = args.text_column
+    if args.clear_result_columns:
+        request["result_columns"] = []
+    elif args.result_column:
+        request["result_columns"] = context_deduplicate(args.result_column)
+    if args.max_search_limit is not None:
+        request["max_search_limit"] = args.max_search_limit
+    request = context_model_payload(
+        CollectionUpdateRequest,
+        request,
+        exclude_unset=True,
+    )
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_update(
+        project_id,
+        args.collection_id,
+        request,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_collections_set_default(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_set_default(
+        project_id,
+        args.collection_id,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_collections_diagnostics(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_diagnostics(project_id, args.collection_id)
+    return _context_emit(ctx, payload, context_diagnostics_human)
+
+
+def handle_context_collections_reindex(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_collections_reindex(
+        project_id,
+        args.collection_id,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_collections_delete(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    if not args.yes and (ctx.json or not sys.stdin.isatty()):
+        raise CliError(
+            "CONTEXT_CONFIRMATION_REQUIRED",
+            "Non-interactive collection deletion requires --yes.",
+            exit_code=USAGE,
+        )
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    preview = ctx.client.context_collections_get(project_id, args.collection_id)
+    if not ctx.json and not ctx.quiet:
+        context_deletion_plan_human(preview)
+    if not _context_delete_confirmed(ctx, args.collection_id, args.yes):
+        return SUCCESS
+    payload = ctx.client.context_collections_delete(
+        project_id,
+        args.collection_id,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_filters_list(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_filters_list(project_id, args.collection_id)
+    return _context_emit(ctx, payload, context_filters_human)
+
+
+def handle_context_filters_add_column(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    request = context_model_payload(
+        FilterColumnRequest,
+        {"key": args.key, "column": args.column},
+    )
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_filters_add_column(
+        project_id,
+        args.collection_id,
+        request,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_filters_add_jsonb_path(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    request = context_model_payload(
+        FilterJsonbPathRequest,
+        {"key": args.key, "column": args.column, "path": args.path},
+    )
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_filters_add_jsonb_path(
+        project_id,
+        args.collection_id,
+        request,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_points_upsert(ctx: Context, args: argparse.Namespace) -> int:
+    return _context_points_mutation(ctx, args, action="upsert")
+
+
+def handle_context_points_delete(ctx: Context, args: argparse.Namespace) -> int:
+    return _context_points_mutation(ctx, args, action="delete")
+
+
+def _context_points_mutation(
+    ctx: Context,
+    args: argparse.Namespace,
+    *,
+    action: str,
+) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    keys = context_validate_source_keys(args.source_key)
+    request = context_model_payload(PointKeysRequest, {"source_keys": keys})
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    method = (
+        ctx.client.context_points_upsert if action == "upsert" else ctx.client.context_points_delete
+    )
+    payload = method(
+        project_id,
+        args.collection_id,
+        request,
+        idempotency_key=key,
+    )
+    if "operation" not in payload:
+        return _context_emit(ctx, payload, context_point_mutation_human)
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_points_status(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_points_status(project_id, args.collection_id)
+    return _context_emit(ctx, payload, context_point_status_human)
+
+
+def handle_context_points_reconcile(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_points_reconcile(
+        project_id,
+        args.collection_id,
+        idempotency_key=key,
+    )
+    if not ctx.json and not ctx.quiet:
+        sys.stderr.write("Final reconciliation may temporarily block writes to the source table.\n")
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_points_scroll(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.collection_id, field="collection_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_points_scroll(
+        project_id,
+        args.collection_id,
+        limit=args.limit,
+        cursor=args.cursor,
+    )
+    return _context_emit(ctx, payload, context_points_scroll_human)
+
+
+def handle_context_operations_list(ctx: Context, args: argparse.Namespace) -> int:
+    if args.collection_id:
+        context_validate_uuid(args.collection_id, field="collection_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_operations_list(
+        project_id,
+        collection_id=args.collection_id,
+        kind=args.kind,
+        status=args.status,
+        limit=args.limit,
+        cursor=args.cursor,
+    )
+    return _context_emit(ctx, payload, context_operations_list_human)
+
+
+def handle_context_operations_get(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.operation_id, field="operation_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_operations_get(project_id, args.operation_id)
+    return _context_emit(ctx, payload, context_operation_human)
+
+
+def handle_context_operations_wait(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.operation_id, field="operation_id")
+    project_id = _resolve_project_id(ctx, None)
+    payload = context_wait_for_operation(
+        ctx.client,
+        project_id=project_id,
+        operation_id=args.operation_id,
+        timeout_seconds=float(args.timeout),
+        poll_interval=args.poll_interval,
+        progress=None if ctx.json or ctx.quiet else context_wait_progress,
+    )
+    return _context_emit(ctx, payload, context_operation_human)
+
+
+def handle_context_operations_cancel(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.operation_id, field="operation_id")
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_operations_cancel(
+        project_id,
+        args.operation_id,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_operations_retry(ctx: Context, args: argparse.Namespace) -> int:
+    context_validate_uuid(args.operation_id, field="operation_id")
+    key = context_idempotency_key(args.idempotency_key)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_operations_retry(
+        project_id,
+        args.operation_id,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, payload, key)
+
+
+def handle_context_count(ctx: Context, args: argparse.Namespace) -> int:
+    request = context_model_payload(
+        CountRequest,
+        {
+            "collection": args.collection,
+            "filter": _context_filter_input(args),
+        },
+    )
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_count(project_id, request)
+    return _context_emit(ctx, payload, context_count_human)
+
+
+def handle_context_facets(ctx: Context, args: argparse.Namespace) -> int:
+    request = context_model_payload(
+        FacetsRequest,
+        {
+            "collection": args.collection,
+            "field": args.field,
+            "filter": _context_filter_input(args),
+            "limit": args.limit,
+        },
+    )
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_facets(project_id, request)
+    return _context_emit(ctx, payload, context_facets_human)
+
+
+def handle_context_search(ctx: Context, args: argparse.Namespace) -> int:
+    return _context_ranked_request(ctx, args, DenseSearchRequest, "search")
+
+
+def handle_context_text_hybrid(ctx: Context, args: argparse.Namespace) -> int:
+    return _context_ranked_request(ctx, args, TextHybridSearchRequest, "text_hybrid")
+
+
+def handle_context_graph_first(ctx: Context, args: argparse.Namespace) -> int:
+    return _context_ranked_request(ctx, args, GraphFirstSearchRequest, "graph_first")
+
+
+def handle_context_vector_first(ctx: Context, args: argparse.Namespace) -> int:
+    return _context_ranked_request(ctx, args, VectorFirstSearchRequest, "vector_first")
+
+
+def handle_context_rank_fusion(ctx: Context, args: argparse.Namespace) -> int:
+    return _context_ranked_request(ctx, args, RankFusionSearchRequest, "rank_fusion")
+
+
+def handle_context_joint(ctx: Context, args: argparse.Namespace) -> int:
+    request = _context_joint_payload(args)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_joint(project_id, request)
+    _context_reject_ranked_cursor(payload)
+    response = context_response_model(ContextJointResponse, payload)
+    if ctx.json:
+        return _context_emit(ctx, payload, context_joint_human)
+    return _context_emit(ctx, response.to_dict(), context_joint_human)
+
+
+def handle_context_grouped_search(ctx: Context, args: argparse.Namespace) -> int:
+    return _context_ranked_request(ctx, args, GroupedSearchRequest, "grouped_search")
+
+
+def handle_context_recall_check(ctx: Context, args: argparse.Namespace) -> int:
+    request = _context_ranked_payload(args, RecallCheckRequest, "recall_check")
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.context_recall_check(project_id, request)
+    _context_reject_ranked_cursor(payload)
+    return _context_emit(ctx, payload, context_recall_human)
+
+
+def _context_ranked_request(
+    ctx: Context,
+    args: argparse.Namespace,
+    model: type[Any],
+    mode: str,
+) -> int:
+    request = _context_ranked_payload(args, model, mode)
+    project_id = _resolve_project_id(ctx, None)
+    method = {
+        "search": ctx.client.context_search,
+        "text_hybrid": ctx.client.context_text_hybrid,
+        "graph_first": ctx.client.context_graph_first,
+        "vector_first": ctx.client.context_vector_first,
+        "rank_fusion": ctx.client.context_rank_fusion,
+        "grouped_search": ctx.client.context_grouped_search,
+    }[mode]
+    payload = method(project_id, request)
+    _context_reject_ranked_cursor(payload)
+    if payload.get("mode") == "joint":
+        raise CliError(
+            "CONTEXT_RESPONSE_INVALID",
+            "Non-Joint Context endpoint returned Joint response mode.",
+            request_id=str(payload.get("request_id") or "") or None,
+        )
+    return _context_emit(ctx, payload, context_ranked_human)
+
+
+def _context_reject_ranked_cursor(payload: dict[str, Any]) -> None:
+    if {"cursor", "next_cursor", "has_more"}.intersection(payload):
+        raise CliError(
+            "CONTEXT_RESPONSE_INVALID",
+            "Ranked Context response unexpectedly contained a cursor.",
+            request_id=str(payload.get("request_id") or "") or None,
+        )
+
+
 def handle_config_path(ctx: Context, args: argparse.Namespace) -> int:
     payload = {"path": str(ctx.store.path)}
     if ctx.json:
@@ -1105,6 +2058,437 @@ def handle_config_path(ctx: Context, args: argparse.Namespace) -> int:
     elif not ctx.quiet:
         sys.stdout.write(payload["path"] + "\n")
     return SUCCESS
+
+
+def handle_notices(ctx: Context, args: argparse.Namespace) -> int:
+    display_notices_safely(
+        base_url=resolve_api_base_url(ctx.config),
+        cli_version=VERSION,
+        force_refresh=True,
+        ignore_display_policy=True,
+        show_empty=True,
+    )
+    return SUCCESS
+
+
+def _display_post_command_notices(
+    *,
+    base_url: str | None = None,
+    force_refresh: bool = False,
+) -> None:
+    if base_url is None:
+        try:
+            config = ConfigStore().load()
+            base_url = resolve_api_base_url(config)
+        except CliError:
+            base_url = os.environ.get("POLYGRES_API_BASE_URL") or DEFAULT_API_BASE_URL
+    display_notices_safely(
+        base_url=base_url,
+        cli_version=VERSION,
+        force_refresh=force_refresh,
+    )
+
+
+def _context_collection_create_request(args: argparse.Namespace) -> dict[str, Any]:
+    body_flags = (
+        args.source,
+        args.schema,
+        args.table,
+        args.source_key_column,
+        args.vector_column,
+        args.content_column,
+        args.metadata_column,
+        args.dimensions,
+        args.metric,
+        args.text_column,
+        args.result_column,
+        args.filter_column,
+        args.jsonb_filter,
+        args.index_kind,
+        args.max_search_limit,
+    )
+    if args.file:
+        if any(value not in (None, [], False) for value in body_flags):
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "--file cannot be combined with collection configuration flags.",
+                exit_code=USAGE,
+            )
+        request = context_read_object(args.file, file_input=True, allow_stdin=True)
+        if "name" in request:
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "The positional collection name is authoritative; remove name from the file.",
+                exit_code=USAGE,
+            )
+        request["name"] = args.name
+        return context_model_payload(CollectionCreateRequest, request)
+    if args.source is None or args.table is None or args.dimensions is None:
+        raise CliError(
+            "CONTEXT_REQUEST_INVALID",
+            "Flag mode requires --source, --table, and --dimensions.",
+            exit_code=USAGE,
+        )
+    source_key = args.source_key_column or "id"
+    if source_key != "id":
+        raise CliError(
+            "CONTEXT_SOURCE_INVALID",
+            "--source-key-column must be id.",
+            exit_code=USAGE,
+        )
+    mode = args.source.replace("-", "_")
+    vector_column = args.vector_column
+    if mode in {"existing", "add_column"} and vector_column is None:
+        raise CliError(
+            "CONTEXT_SOURCE_INVALID",
+            "--vector-column is required for existing and add-column sources.",
+            exit_code=USAGE,
+        )
+    if mode != "new_table" and (
+        args.content_column is not None or args.metadata_column is not None
+    ):
+        raise CliError(
+            "CONTEXT_SOURCE_INVALID",
+            "--content-column and --metadata-column are valid only for new-table sources.",
+            exit_code=USAGE,
+        )
+    source: dict[str, Any] = {
+        "mode": mode,
+        "schema_name": args.schema or "public",
+        "table_name": args.table,
+        "source_key_column": source_key,
+    }
+    if mode == "new_table":
+        source["content_column"] = args.content_column or "content"
+        source["metadata_column"] = args.metadata_column or "metadata"
+        vector_column = vector_column or "embedding"
+        if args.text_column is not None and args.text_column != source["content_column"]:
+            raise CliError(
+                "CONTEXT_SOURCE_INVALID",
+                "--text-column must equal the generated content column for new-table.",
+                exit_code=USAGE,
+            )
+    request = {
+        "name": args.name,
+        "source": source,
+        "vector": {
+            "column_name": vector_column,
+            "dimensions": args.dimensions,
+            "metric": args.metric or "cosine",
+        },
+        "text_column": args.text_column,
+        "result_columns": context_deduplicate(args.result_column),
+        "filter_columns": context_deduplicate(args.filter_column),
+        "jsonb_filter_paths": context_parse_jsonb_filters(args.jsonb_filter),
+        "index_kind": args.index_kind or "hnsw",
+        "max_search_limit": args.max_search_limit or 1000,
+    }
+    return context_model_payload(CollectionCreateRequest, request)
+
+
+def _context_ranked_payload(
+    args: argparse.Namespace,
+    model: type[Any],
+    mode: str,
+) -> dict[str, Any]:
+    if args.request is not None:
+        body_fields = (
+            "embedding_json",
+            "embedding_file",
+            "limit",
+            "filter_json",
+            "filter_file",
+            "query",
+            "start_schema",
+            "start_table",
+            "start_id",
+            "context_limit",
+            "max_depth",
+            "graph_limit",
+            "relationship_type",
+            "direction",
+            "context_weight",
+            "graph_weight",
+            "group_by",
+            "group_limit",
+            "minimum_recall",
+        )
+        conflicts = [
+            name
+            for name in body_fields
+            if hasattr(args, name) and getattr(args, name) is not None and getattr(args, name) != []
+        ]
+        if conflicts:
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "--request cannot be combined with request-body flags.",
+                exit_code=USAGE,
+                details={"fields": conflicts},
+            )
+        request = context_read_object(args.request, file_input=True, allow_stdin=True)
+        if "collection" in request:
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "The positional collection is authoritative; remove collection from the request.",
+                exit_code=USAGE,
+            )
+        request["collection"] = args.collection
+        if request.get("direction") == "both":
+            request["direction"] = "any"
+        if mode == "text_hybrid" and (
+            not isinstance(request.get("query"), str) or not request["query"].strip()
+        ):
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "The request query must contain non-whitespace text.",
+                exit_code=USAGE,
+            )
+        return context_model_payload(model, request)
+
+    embedding_json = getattr(args, "embedding_json", None)
+    embedding_file = getattr(args, "embedding_file", None)
+    if (embedding_json is None) == (embedding_file is None):
+        raise CliError(
+            "CONTEXT_EMBEDDING_INVALID",
+            "Provide exactly one of --embedding-json or --embedding-file.",
+            exit_code=USAGE,
+        )
+    embedding = context_read_array(
+        embedding_json if embedding_json is not None else embedding_file,
+        file_input=embedding_file is not None,
+    )
+    request: dict[str, Any] = {
+        "collection": args.collection,
+        "embedding": context_validate_embedding(embedding),
+        "limit": args.limit or 10,
+    }
+    if hasattr(args, "filter_json"):
+        request["filter"] = _context_filter_input(args)
+    if mode == "text_hybrid":
+        if not args.query or not args.query.strip():
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "--query must contain non-whitespace text.",
+                exit_code=USAGE,
+            )
+        request["query"] = args.query
+    if mode in {"graph_first", "rank_fusion"}:
+        start = (args.start_schema, args.start_table, args.start_id)
+        if not all(start):
+            raise CliError(
+                "CONTEXT_GRAPH_START_REQUIRED",
+                "Graph-first and rank-fusion require all graph start flags.",
+                exit_code=USAGE,
+                details={"mode": mode},
+            )
+        request["start"] = {
+            "schema": args.start_schema,
+            "table": args.start_table,
+            "id": args.start_id,
+        }
+    if mode in {"graph_first", "vector_first", "rank_fusion"}:
+        request.update(
+            {
+                "max_depth": args.max_depth or 2,
+                "graph_limit": args.graph_limit or 200,
+                "relationship_types": context_deduplicate(args.relationship_type),
+                "direction": "any" if args.direction in {None, "both"} else args.direction,
+            }
+        )
+    if mode in {"vector_first", "rank_fusion"}:
+        request["context_limit"] = args.context_limit or 50
+    if mode == "rank_fusion":
+        context_weight = 0.7 if args.context_weight is None else args.context_weight
+        graph_weight = 0.3 if args.graph_weight is None else args.graph_weight
+        context_validate_weights(context_weight, graph_weight)
+        request["weights"] = {"context": context_weight, "graph": graph_weight}
+    if mode == "grouped_search":
+        if not args.group_by:
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "--group-by is required.",
+                exit_code=USAGE,
+            )
+        request["group_by"] = args.group_by
+        request["group_limit"] = args.group_limit or 1
+    if mode == "recall_check":
+        request["minimum_recall"] = context_validate_recall(
+            0.95 if args.minimum_recall is None else args.minimum_recall
+        )
+    return context_model_payload(model, request)
+
+
+def _context_joint_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.request is not None:
+        body_fields = (
+            "embedding_json",
+            "embedding_file",
+            "limit",
+            "filter_json",
+            "filter_file",
+            "query",
+            "start_json",
+            "context_limit",
+            "seed_limit",
+            "max_depth",
+            "graph_limit",
+            "traversal_limit",
+            "relationship_type",
+            "direction",
+            "semantic_weight",
+            "lexical_weight",
+            "graph_weight",
+        )
+        conflicts = [
+            name
+            for name in body_fields
+            if getattr(args, name) is not None and getattr(args, name) != []
+        ]
+        if conflicts:
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "--request cannot be combined with request-body flags.",
+                exit_code=USAGE,
+                details={"fields": conflicts},
+            )
+        request = context_read_object(args.request, file_input=True, allow_stdin=True)
+        if "collection" in request:
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID",
+                "The positional collection is authoritative; remove collection from the request.",
+                exit_code=USAGE,
+            )
+        request["collection"] = args.collection
+        if request.get("direction") == "both":
+            request["direction"] = "any"
+        return context_model_payload(JointSearchRequest, request)
+
+    embedding_json = args.embedding_json
+    embedding_file = args.embedding_file
+    if (embedding_json is None) == (embedding_file is None):
+        raise CliError(
+            "CONTEXT_EMBEDDING_INVALID",
+            "Provide exactly one of --embedding-json or --embedding-file.",
+            exit_code=USAGE,
+        )
+    embedding = context_read_array(
+        embedding_json if embedding_json is not None else embedding_file,
+        file_input=embedding_file is not None,
+    )
+    starts = [
+        context_read_object(value, file_input=False, code="CONTEXT_REQUEST_INVALID")
+        for value in args.start_json
+    ]
+    semantic_weight = 0.7 if args.semantic_weight is None else args.semantic_weight
+    lexical_weight = 0.0 if args.lexical_weight is None else args.lexical_weight
+    graph_weight = 0.3 if args.graph_weight is None else args.graph_weight
+    context_validate_joint_weights(semantic_weight, lexical_weight, graph_weight)
+    request = {
+        "collection": args.collection,
+        "embedding": context_validate_embedding(embedding),
+        "query": args.query,
+        "starts": starts,
+        "filter": _context_filter_input(args),
+        "relationship_types": context_deduplicate(args.relationship_type),
+        "direction": "any" if args.direction in {None, "both"} else args.direction,
+        "max_depth": args.max_depth or 2,
+        "context_limit": args.context_limit or 50,
+        "seed_limit": args.seed_limit or 8,
+        "graph_limit": args.graph_limit or 200,
+        "traversal_limit": args.traversal_limit or 500,
+        "weights": {
+            "semantic": semantic_weight,
+            "lexical": lexical_weight,
+            "graph": graph_weight,
+        },
+        "limit": args.limit or 10,
+    }
+    return context_model_payload(JointSearchRequest, request)
+
+
+def _context_filter_input(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.filter_json is not None and args.filter_file is not None:
+        raise CliError(
+            "CONTEXT_FILTER_INVALID",
+            "--filter-json and --filter-file are mutually exclusive.",
+            exit_code=USAGE,
+        )
+    if args.filter_json is not None:
+        value = context_read_object(
+            args.filter_json,
+            file_input=False,
+            code="CONTEXT_FILTER_INVALID",
+        )
+        return context_validate_filter(value)
+    if args.filter_file is not None:
+        value = context_read_object(
+            args.filter_file,
+            file_input=True,
+            code="CONTEXT_FILTER_INVALID",
+        )
+        return context_validate_filter(value)
+    return None
+
+
+def _context_mutation_result(
+    ctx: Context,
+    args: argparse.Namespace,
+    project_id: str,
+    payload: dict[str, Any],
+    idempotency_key: str,
+) -> int:
+    operation = payload.get("operation")
+    if not isinstance(operation, dict):
+        return _context_emit(ctx, payload, context_point_mutation_human)
+    operation_id = operation.get("id")
+    if not isinstance(operation_id, str):
+        raise CliError(
+            "CONTEXT_OPERATION_RESPONSE_INVALID",
+            "Context mutation response did not include an operation ID.",
+            request_id=str(payload.get("request_id") or "") or None,
+        )
+    if not args.no_wait:
+        payload = context_wait_for_operation(
+            ctx.client,
+            project_id=project_id,
+            operation_id=operation_id,
+            timeout_seconds=float(args.timeout),
+            initial_envelope=payload,
+            progress=None if ctx.json or ctx.quiet else context_wait_progress,
+        )
+    return _context_emit(
+        ctx,
+        payload,
+        context_operation_human,
+        idempotency_key=idempotency_key,
+    )
+
+
+def _context_emit(
+    ctx: Context,
+    payload: dict[str, Any],
+    human: Any,
+    **kwargs: Any,
+) -> int:
+    if ctx.json:
+        write_json(payload)
+    elif not ctx.quiet:
+        human(payload, verbose=bool(ctx.args.verbose), **kwargs)
+    return SUCCESS
+
+
+def _context_delete_confirmed(ctx: Context, collection_id: str, yes: bool) -> bool:
+    if yes:
+        return True
+    if not sys.stdin.isatty():
+        raise CliError(
+            "CONTEXT_CONFIRMATION_REQUIRED",
+            "Re-run with --yes to delete the Context collection.",
+            exit_code=USAGE,
+        )
+    sys.stderr.write(f"Delete Context collection {collection_id}? [y/N] ")
+    answer = sys.stdin.readline().strip().lower()
+    return answer in {"y", "yes"}
 
 
 def _resolve_project_id(ctx: Context, positional: str | None) -> str:
@@ -1138,7 +2522,8 @@ def _resolve_project(ctx: Context, candidate: str) -> dict[str, Any]:
     if not matches:
         raise CliError(
             "PROJECT_NOT_FOUND",
-            "Project not found.",
+            "Project not found. Run `polygres projects list` and retry with a valid "
+            "project ID or exact name.",
             exit_code=NOT_FOUND,
             details={"project": candidate},
             request_id=projects_payload.get("request_id"),
@@ -1281,15 +2666,11 @@ def _project_status_output(project_id: str, payload: dict[str, Any]) -> dict[str
             }
         if not resources:
             resources = {
-                key: status[key]
-                for key in ("last_storage_measurement", "memory")
-                if key in status
+                key: status[key] for key in ("last_storage_measurement", "memory") if key in status
             }
         if not readiness:
             readiness = {
-                key: status[key]
-                for key in ("graph", "hybrid", "text", "vector")
-                if key in status
+                key: status[key] for key in ("graph", "hybrid", "text", "vector") if key in status
             }
 
     output = {
@@ -1302,9 +2683,7 @@ def _project_status_output(project_id: str, payload: dict[str, Any]) -> dict[str
     return output
 
 
-def _poll_project_status(
-    ctx: Context, project_id: str, *, deadline: float
-) -> dict[str, Any]:
+def _poll_project_status(ctx: Context, project_id: str, *, deadline: float) -> dict[str, Any]:
     last_status: dict[str, Any] = {}
     while time.monotonic() <= deadline:
         payload = ctx.client.get_project_status(project_id, deadline=deadline)
@@ -1318,7 +2697,12 @@ def _poll_project_status(
         if project_status in {"ready", "read_only"}:
             return last_status
         if project_status == "failed":
-            raise CliError("PROJECT_PROVISIONING_FAILED", "Project provisioning failed.")
+            raise CliError(
+                "PROJECT_PROVISIONING_FAILED",
+                f"Project {project_id} could not be provisioned. Run "
+                f"`polygres projects status {project_id}` to inspect the failure; "
+                "contact support if the status does not provide a corrective action.",
+            )
         if project_status in {"suspended", "deleting"}:
             raise CliError(
                 "PROJECT_UNAVAILABLE", f"Project is {project_status}.", exit_code=CONFLICT
@@ -1365,13 +2749,10 @@ def _project_create_wait_error(
         key: value for key, value in details["project"].items() if value is not None
     }
     code = (
-        "PROJECT_READINESS_TIMEOUT"
-        if cause.code == "TIMEOUT"
-        else "PROJECT_READINESS_UNAVAILABLE"
+        "PROJECT_READINESS_TIMEOUT" if cause.code == "TIMEOUT" else "PROJECT_READINESS_UNAVAILABLE"
     )
     message = (
-        f"Project {project_id} was created"
-        " but readiness polling timed out."
+        f"Project {project_id} was created but readiness polling timed out."
         if cause.code == "TIMEOUT"
         else f"Project {project_id} was created but readiness polling failed."
     )
@@ -1492,7 +2873,11 @@ def _latest_import_id(imports: list[dict[str, Any]]) -> str | None:
     )
     job_id = imports[0].get("id")
     if not isinstance(job_id, str):
-        raise CliError("IMPORT_INVALID", "Latest import did not include an ID.")
+        raise CliError(
+            "IMPORT_INVALID",
+            "The latest import record has no ID. Run `polygres import status <job_id>` "
+            "with the ID from the original import output; contact support if no ID was returned.",
+        )
     return job_id
 
 
@@ -1544,9 +2929,18 @@ def _json_object_file(value: str) -> dict[str, Any]:
     try:
         payload = json.loads(_read_text_file(path))
     except json.JSONDecodeError as exc:
-        raise CliError("VALIDATION_ERROR", f"Invalid JSON file: {path}", exit_code=USAGE) from exc
+        raise CliError(
+            "VALIDATION_ERROR",
+            f"Invalid JSON file: {path}. Fix the JSON syntax near line {exc.lineno}, "
+            f"column {exc.colno}, then retry.",
+            exit_code=USAGE,
+        ) from exc
     if not isinstance(payload, dict):
-        raise CliError("VALIDATION_ERROR", "JSON file must contain an object.", exit_code=USAGE)
+        raise CliError(
+            "VALIDATION_ERROR",
+            "JSON file must contain an object at the top level. Wrap the fields in `{}` and retry.",
+            exit_code=USAGE,
+        )
     return payload
 
 
@@ -1583,12 +2977,10 @@ def _graph_configuration_file(value: str) -> dict[str, Any]:
         "graph configuration",
     )
     request_configuration = {
-        key: configuration[key]
-        for key in GRAPH_CONFIGURATION_KEYS
-        if key in configuration
+        key: configuration[key] for key in GRAPH_CONFIGURATION_KEYS if key in configuration
     }
     _validate_graph_configuration(request_configuration)
-    return request_configuration
+    return _canonicalize_graph_id_columns(request_configuration)
 
 
 def _graph_discovery_configuration(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1653,6 +3045,18 @@ def _graph_discovery_configuration(payload: dict[str, Any]) -> dict[str, Any]:
             f"Graph discovery response is not applyable: {exc.message}",
             details=exc.details,
         ) from exc
+    return _canonicalize_graph_id_columns(configuration)
+
+
+def _canonicalize_graph_id_columns(
+    configuration: dict[str, Any],
+) -> dict[str, Any]:
+    for table in configuration.get("registered_tables", []):
+        if not isinstance(table, dict):
+            continue
+        legacy_id_column = table.pop("id_column", None)
+        if legacy_id_column:
+            table["id_columns"] = [legacy_id_column]
     return configuration
 
 
@@ -1805,6 +3209,56 @@ def _timeout_seconds(value: str) -> int:
     return seconds
 
 
+def _context_admin_limit(value: str) -> int:
+    return _context_bounded_integer(value, label="limit", minimum=1, maximum=100)
+
+
+def _context_ranked_limit(value: str) -> int:
+    return _context_bounded_integer(value, label="limit", minimum=1, maximum=1000)
+
+
+def _context_graph_depth(value: str) -> int:
+    return _context_bounded_integer(value, label="max depth", minimum=1, maximum=20)
+
+
+def _context_joint_seed_limit(value: str) -> int:
+    return _context_bounded_integer(value, label="seed limit", minimum=1, maximum=32)
+
+
+def _context_dimensions(value: str) -> int:
+    return _context_bounded_integer(value, label="dimensions", minimum=1, maximum=16000)
+
+
+def _context_bounded_integer(
+    value: str,
+    *,
+    label: str,
+    minimum: int,
+    maximum: int,
+) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{label} must be an integer") from exc
+    if parsed < minimum or parsed > maximum:
+        raise argparse.ArgumentTypeError(f"{label} must be between {minimum} and {maximum}")
+    return parsed
+
+
+def _context_finite_float(value: str) -> float:
+    try:
+        return context_finite_number(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def _context_poll_interval_arg(value: str) -> float:
+    parsed = _context_finite_float(value)
+    if parsed < 0.5 or parsed > 30:
+        raise argparse.ArgumentTypeError("poll interval must be between 0.5 and 30")
+    return parsed
+
+
 def _dimensions(value: str) -> int:
     try:
         dimensions = int(value)
@@ -1873,6 +3327,19 @@ def _summary_value(value: object) -> str:
         if key in value:
             return str(value[key])
     return json.dumps(value, sort_keys=True) if value else ""
+
+
+def _graph_difference_summary(value: object) -> str:
+    if not isinstance(value, list):
+        return ""
+    summaries: list[str] = []
+    for item in value[:5]:
+        if not isinstance(item, dict):
+            continue
+        field = str(item.get("field") or "unknown")[:80]
+        reason = str(item.get("reason") or "mismatch")[:80]
+        summaries.append(f"{field} ({reason})")
+    return ", ".join(summaries)
 
 
 def _resource_pressure(resources: dict[str, Any]) -> str:

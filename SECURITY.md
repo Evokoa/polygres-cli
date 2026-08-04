@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Report suspected vulnerabilities privately by emailing support@evokoa.com.
+Report suspected vulnerabilities privately by emailing support@polygres.com.
 Include the affected CLI version, a clear description, reproduction steps, and
 known impact. Do not open a public issue for a security vulnerability.
 

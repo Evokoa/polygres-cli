@@ -8,7 +8,7 @@ from polygres_cli.cli_errors import CliError
 from polygres_cli.cli_secrets import redact
 
 
-def write_json(payload: dict[str, Any], *, stream: TextIO | None = None) -> None:
+def write_json(payload: Any, *, stream: TextIO | None = None) -> None:
     target = stream or sys.stdout
     target.write(json.dumps(payload, sort_keys=True) + "\n")
 
