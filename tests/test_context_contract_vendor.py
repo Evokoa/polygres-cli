@@ -7,13 +7,15 @@ from polygres_cli._vendor.polygres_lib import context
 
 
 def test_shared_context_fixtures_validate_through_vendored_contracts() -> None:
-    fixture_path = (
-        Path(__file__).parents[2]
-        / "polygres-lib"
-        / "fixtures"
-        / "context"
-        / "contract-fixtures.json"
-    )
+    fixture_path = Path(__file__).parent / "fixtures" / "context" / "contract-fixtures.json"
+    if not fixture_path.exists():
+        fixture_path = (
+            Path(__file__).parents[2]
+            / "polygres-lib"
+            / "fixtures"
+            / "context"
+            / "contract-fixtures.json"
+        )
     fixtures = json.loads(fixture_path.read_text(encoding="utf-8"))
 
     for model_name, payload in fixtures["requests"].items():

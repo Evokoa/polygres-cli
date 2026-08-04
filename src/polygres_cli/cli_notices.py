@@ -8,7 +8,7 @@ import sys
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, TextIO
 from urllib.parse import urlsplit
@@ -169,7 +169,7 @@ def _parse_datetime(value: object) -> datetime | None:
     parsed = datetime.fromisoformat(normalized)
     if parsed.tzinfo is None:
         raise ValueError("notice timestamps must include a timezone")
-    return parsed.astimezone(UTC)
+    return parsed.astimezone(timezone.utc)
 
 
 def _string_targets(value: object) -> tuple[str, ...]:
@@ -275,7 +275,7 @@ class NoticeManager:
         self._cli_version = parsed_version
         self._state_path = state_path or default_notice_state_path()
         self._client = client
-        self._now = now or (lambda: datetime.now(UTC))
+        self._now = now or (lambda: datetime.now(timezone.utc))
         self._channel = channel or release_channel(cli_version)
         self._operating_system = operating_system or normalized_operating_system()
         self._architecture = architecture or normalized_architecture()
@@ -289,7 +289,7 @@ class NoticeManager:
         stream: TextIO | None = None,
     ) -> list[Notice]:
         stream = stream or sys.stderr
-        now = self._now().astimezone(UTC)
+        now = self._now().astimezone(timezone.utc)
         state = self._load_state()
         payload = self._payload(state, now=now, force_refresh=force_refresh)
         try:

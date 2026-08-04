@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -13,7 +13,7 @@ from polygres_cli.cli_notices import NoticeManager, parse_semver, sanitize_text
 
 API_BASE_URL = "https://api.example.test/v1"
 NOTICE_URL = f"{API_BASE_URL}/cli/notices"
-NOW = datetime(2026, 7, 31, 12, 0, tzinfo=UTC)
+NOW = datetime(2026, 7, 31, 12, 0, tzinfo=timezone.utc)
 ROUTE_CTX = getattr(respx, "mo" + "ck")
 
 

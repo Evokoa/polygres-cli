@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlsplit
@@ -32,7 +32,7 @@ class RuntimeClient:
     ) -> None:
         self._grant_provider = grant_provider
         self._client = http_client
-        self._now = now or (lambda: datetime.now(UTC))
+        self._now = now or (lambda: datetime.now(timezone.utc))
         self._max_retries = max_retries
         self._allow_local_http = allow_local_http
         self._grants: dict[tuple[str, str], dict[str, Any]] = {}
@@ -201,7 +201,7 @@ def _wait_for_retry_after(response: httpx.Response) -> None:
         delay = float(value)
     except ValueError:
         try:
-            delay = (parsedate_to_datetime(value) - datetime.now(UTC)).total_seconds()
+            delay = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
         except (TypeError, ValueError):
             return
     if delay > 0:

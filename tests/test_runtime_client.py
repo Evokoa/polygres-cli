@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 import httpx
 import pytest
@@ -39,7 +39,7 @@ def test_runtime_client_keeps_control_and_runtime_credentials_isolated() -> None
     client = RuntimeClient(
         grant_provider=grant_provider,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
-        now=lambda: datetime(2026, 7, 22, tzinfo=UTC),
+        now=lambda: datetime(2026, 7, 22, tzinfo=timezone.utc),
     )
 
     client.get(PROJECT_ID, "graph:read", "/graph/status")
@@ -76,7 +76,7 @@ def test_runtime_client_refreshes_once_on_401_but_does_not_replay_network_mutati
     client = RuntimeClient(
         grant_provider=grant_provider,
         http_client=httpx.Client(transport=httpx.MockTransport(auth_handler)),
-        now=lambda: datetime(2026, 7, 22, tzinfo=UTC),
+        now=lambda: datetime(2026, 7, 22, tzinfo=timezone.utc),
     )
     assert client.get(PROJECT_ID, "graph:read", "/graph/status")["request_id"] == "req_ok"
     assert grants == 2
@@ -91,7 +91,7 @@ def test_runtime_client_refreshes_once_on_401_but_does_not_replay_network_mutati
     mutation = RuntimeClient(
         grant_provider=lambda project_id, scope: _grant(scope),
         http_client=httpx.Client(transport=httpx.MockTransport(lost_handler)),
-        now=lambda: datetime(2026, 7, 22, tzinfo=UTC),
+        now=lambda: datetime(2026, 7, 22, tzinfo=timezone.utc),
     )
     with pytest.raises(httpx.ReadTimeout):
         mutation.request(
@@ -125,7 +125,7 @@ def test_runtime_client_does_not_retry_maintenance_response() -> None:
     client = RuntimeClient(
         grant_provider=lambda project_id, scope: _grant(scope),
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
-        now=lambda: datetime(2026, 7, 22, tzinfo=UTC),
+        now=lambda: datetime(2026, 7, 22, tzinfo=timezone.utc),
         max_retries=2,
     )
 
