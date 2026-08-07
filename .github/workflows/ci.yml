@@ -36,5 +36,8 @@ jobs:
       - name: Run lint
         run: ruff check .
 
+      - name: Verify release version
+        run: python tools/verify_release_version.py
+
       - name: Build package
         run: python -m build

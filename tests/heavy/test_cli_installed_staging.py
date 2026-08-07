@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from polygres_cli import __version__
+
 pytestmark = pytest.mark.heavy
 
 
@@ -31,7 +33,7 @@ def test_installed_cli_staging_whoami_contract(tmp_path: Path) -> None:
         [executable, "--version"], env=env, text=True, capture_output=True, check=False
     )
     assert version.returncode == 0
-    assert version.stdout.strip() == "polygres 0.2.0"
+    assert version.stdout.strip() == f"polygres {__version__}"
 
     notices = subprocess.run(
         [executable, "--json", "notices"],

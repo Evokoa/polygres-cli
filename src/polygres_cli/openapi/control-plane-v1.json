@@ -1373,6 +1373,15 @@
           "vector_name": {
             "title": "Vector Name",
             "type": "string"
+          },
+          "vector_type_owner": {
+            "default": "pgcontext",
+            "enum": [
+              "pgcontext",
+              "pgvector"
+            ],
+            "title": "Vector Type Owner",
+            "type": "string"
           }
         },
         "required": [
@@ -1839,6 +1848,167 @@
           "l1"
         ],
         "title": "ContextMetric",
+        "type": "string"
+      },
+      "ContextOnboardingCandidate": {
+        "additionalProperties": true,
+        "properties": {
+          "dimensions": {
+            "title": "Dimensions",
+            "type": "integer"
+          },
+          "embedding_column": {
+            "title": "Embedding Column",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "metric": {
+            "$ref": "#/components/schemas/ContextMetric"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "row_id_column": {
+            "title": "Row Id Column",
+            "type": "string"
+          },
+          "schema_name": {
+            "title": "Schema Name",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          },
+          "vector_configuration_id": {
+            "format": "uuid",
+            "title": "Vector Configuration Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vector_configuration_id",
+          "name",
+          "schema_name",
+          "table_name",
+          "row_id_column",
+          "embedding_column",
+          "dimensions",
+          "metric",
+          "is_default"
+        ],
+        "title": "ContextOnboardingCandidate",
+        "type": "object"
+      },
+      "ContextOnboardingResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ContextOnboardingCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "compatibility_generation": {
+            "title": "Compatibility Generation",
+            "type": "integer"
+          },
+          "completed_collection_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed Collection Id"
+          },
+          "evaluated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluated At"
+          },
+          "offer_acknowledged": {
+            "title": "Offer Acknowledged",
+            "type": "boolean"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "selected_vector_configuration_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Vector Configuration Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContextOnboardingStatus"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Status"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "request_id",
+          "status",
+          "compatibility_generation",
+          "candidates",
+          "offer_acknowledged",
+          "selected_vector_configuration_id",
+          "completed_collection_id",
+          "evaluated_at",
+          "updated_at"
+        ],
+        "title": "ContextOnboardingResponse",
+        "type": "object"
+      },
+      "ContextOnboardingStatus": {
+        "enum": [
+          "unassessed",
+          "eligible",
+          "dismissed",
+          "completed",
+          "ineligible"
+        ],
+        "title": "ContextOnboardingStatus",
         "type": "string"
       },
       "ContextOperation": {
@@ -5574,6 +5744,17 @@
             "title": "Pgcontext Installed",
             "type": "boolean"
           },
+          "pgcontext_pgvector_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pgcontext Pgvector Version"
+          },
           "pgcontext_source_commit": {
             "anyOf": [
               {
@@ -5600,9 +5781,36 @@
             "title": "Pgvector Installed",
             "type": "boolean"
           },
+          "pgvector_schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pgvector Schema"
+          },
+          "pgvector_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pgvector Version"
+          },
           "postgres_major": {
             "title": "Postgres Major",
             "type": "integer"
+          },
+          "same_column_bridge": {
+            "default": false,
+            "title": "Same Column Bridge",
+            "type": "boolean"
           }
         },
         "required": [
@@ -10018,6 +10226,336 @@
           }
         ],
         "summary": "Context Proxy Context Vector First",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/onboarding": {
+      "get": {
+        "operationId": "context_get_onboarding",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextOnboardingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Get Onboarding",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/onboarding/acknowledge": {
+      "post": {
+        "operationId": "context_acknowledge_onboarding",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextOnboardingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Acknowledge Onboarding",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/onboarding/dismiss": {
+      "post": {
+        "operationId": "context_dismiss_onboarding",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextOnboardingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Dismiss Onboarding",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/onboarding/evaluate": {
+      "post": {
+        "operationId": "context_evaluate_onboarding",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextOnboardingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Evaluate Onboarding",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/onboarding/refresh": {
+      "post": {
+        "operationId": "context_refresh_onboarding",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextOnboardingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Refresh Onboarding",
         "tags": [
           "context"
         ]

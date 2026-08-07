@@ -8,7 +8,7 @@ import httpx
 import pytest
 import respx
 
-from polygres_cli import cli
+from polygres_cli import __version__, cli
 from polygres_cli.cli_notices import NoticeManager, parse_semver, sanitize_text
 
 API_BASE_URL = "https://api.example.test/v1"
@@ -303,7 +303,7 @@ def test_version_forces_refresh_and_offline_failure_is_silent(
     captured = capsys.readouterr()
 
     assert result == 0
-    assert captured.out == "polygres 0.2.0\n"
+    assert captured.out == f"polygres {__version__}\n"
     assert captured.err == ""
     assert route.called
 

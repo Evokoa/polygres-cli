@@ -43,11 +43,56 @@ jobs:
       - name: Run tests
         run: python -m pytest
 
+      - name: Verify release version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            python tools/verify_release_version.py --tag "$GITHUB_REF_NAME"
+          else
+            python tools/verify_release_version.py
+          fi
+
       - name: Build CLI distribution
         run: |
           rm -rf dist
           python -m build
           python -m twine check dist/*
+
+      - name: Verify clean wheel installation
+        run: |
+          smoke_dir="$RUNNER_TEMP/polygres-cli-wheel-smoke"
+          python -m venv "$smoke_dir"
+          "$smoke_dir/bin/python" -m pip install dist/*.whl
+          "$smoke_dir/bin/python" - <<'PY'
+          import importlib.metadata
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          from polygres_cli import __version__
+
+          expected = importlib.metadata.version("polygres-cli")
+          assert __version__ == expected
+          result = subprocess.run(
+              [str(Path(sys.executable).with_name("polygres")), "--version"],
+              check=True,
+              capture_output=True,
+              env={**os.environ, "POLYGRES_API_BASE_URL": "http://127.0.0.1:9/v1"},
+              text=True,
+          )
+          assert result.stdout.splitlines()[0] == f"polygres {expected}"
+          PY
+
+      - name: Verify clean source distribution installation
+        run: |
+          smoke_dir="$RUNNER_TEMP/polygres-cli-sdist-smoke"
+          python -m venv "$smoke_dir"
+          "$smoke_dir/bin/python" -m pip install dist/*.tar.gz
+          "$smoke_dir/bin/python" - <<'PY'
+          import importlib.metadata
+          from polygres_cli import __version__
+
+          assert __version__ == importlib.metadata.version("polygres-cli")
+          PY
 
       - name: Upload CLI distributions
         uses: actions/upload-artifact@v4

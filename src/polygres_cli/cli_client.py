@@ -14,6 +14,7 @@ from urllib.parse import quote, urlencode, urlsplit
 
 import httpx
 
+from polygres_cli._version import __version__
 from polygres_cli.api_openapi import ApiRequestPlan
 from polygres_cli.cli_auth import (
     normalize_poll_response,
@@ -33,7 +34,6 @@ from polygres_cli.cli_errors import (
 from polygres_cli.cli_secrets import redact_string
 from polygres_cli.runtime_client import RuntimeClient
 
-VERSION = "0.2.0"
 RETRY_STATUSES = {408, 429, 500, 502, 503, 504}
 HEAVY_REQUEST_TIMEOUT = 120.0
 
@@ -428,6 +428,18 @@ class CliControlPlaneClient:
 
     def context_capabilities(self, project_id: str) -> dict[str, Any]:
         return self._get(self._context_path(project_id, "/capabilities"))
+
+    def context_onboarding(self, project_id: str) -> dict[str, Any]:
+        return self._get(self._context_path(project_id, "/onboarding"))
+
+    def context_onboarding_action(self, project_id: str, action: str) -> dict[str, Any]:
+        if action not in {"evaluate", "refresh", "acknowledge", "dismiss"}:
+            raise ValueError(f"Unsupported Context onboarding action: {action}")
+        return self._post(
+            self._context_path(project_id, f"/onboarding/{action}"),
+            {},
+            retry=True,
+        )
 
     def context_discover(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/discover"), payload, retry=True)
@@ -826,7 +838,7 @@ class CliControlPlaneClient:
     ) -> Any | ContextPollResponse:
         if auth and not self._access_token:
             raise CliError("AUTH_REQUIRED", "Run `polygres login` to continue.", exit_code=3)
-        headers = {"User-Agent": f"polygres-cli/{VERSION}"}
+        headers = {"User-Agent": f"polygres-cli/{__version__}"}
         if auth and self._access_token:
             headers["Authorization"] = f"Bearer {self._access_token}"
         if idempotency_key is not None:

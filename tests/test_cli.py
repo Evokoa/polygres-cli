@@ -13,7 +13,7 @@ import httpx
 import pytest
 import respx
 
-from polygres_cli import cli, cli_client
+from polygres_cli import __version__, cli, cli_client
 from polygres_cli.cli_auth import normalize_poll_response, validate_start_response
 from polygres_cli.cli_client import CliControlPlaneClient
 from polygres_cli.cli_config import ConfigStore
@@ -136,7 +136,7 @@ def test_version_and_config_path_json(
 ) -> None:
     rc, out, _ = run_cli(["--version"], capsys, monkeypatch, tmp_path)
     assert rc == 0
-    assert out.strip() == "polygres 0.2.0"
+    assert out.strip() == f"polygres {__version__}"
 
     rc, out, _ = run_cli(["--json", "config", "path"], capsys, monkeypatch, tmp_path)
     assert rc == 0
@@ -474,7 +474,7 @@ def test_projects_list_uses_env_token_and_selected_project_json(
     assert err == ""
     assert route.called
     assert route.calls[0].request.headers["Authorization"] == f"Bearer {ACCESS_TOKEN}"
-    assert route.calls[0].request.headers["User-Agent"] == "polygres-cli/0.2.0"
+    assert route.calls[0].request.headers["User-Agent"] == f"polygres-cli/{__version__}"
     assert json.loads(out) == {
         "projects": [{"id": PROJECT_ID, "name": "Support", "status": "ready"}],
         "selected_project_id": PROJECT_ID,
@@ -757,6 +757,106 @@ def test_projects_status_normalizes_status_payload_shape(
     assert payload["readiness"]["vector"] == {"ready": False, "default_config": None}
     assert "status" not in payload
     assert payload["request_id"] == "req_status"
+
+
+@ROUTE_CTX
+def test_projects_status_global_project_overrides_selected_project(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": OTHER_PROJECT_ID})
+    route = _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/status"),
+        return_value=httpx.Response(
+            200,
+            json={"request_id": "req_status", "status": {"project": "ready"}},
+        ),
+    )
+
+    rc, out, err = run_cli(
+        ["--json", "--project", PROJECT_ID, "projects", "status"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 0
+    assert err == ""
+    assert route.called
+    assert json.loads(out)["project"]["id"] == PROJECT_ID
+
+
+@ROUTE_CTX
+def test_projects_status_positional_project_overrides_global_project(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    route = _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/status"),
+        return_value=httpx.Response(
+            200,
+            json={"request_id": "req_status", "status": {"project": "ready"}},
+        ),
+    )
+
+    rc, out, err = run_cli(
+        ["--json", "--project", OTHER_PROJECT_ID, "projects", "status", PROJECT_ID],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 0
+    assert err == ""
+    assert route.called
+    assert json.loads(out)["project"]["id"] == PROJECT_ID
+
+
+@ROUTE_CTX
+def test_projects_status_global_exact_name_overrides_selected_project(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": OTHER_PROJECT_ID})
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_projects",
+                "projects": [
+                    {
+                        "id": PROJECT_UUID,
+                        "external_id": PROJECT_ID,
+                        "name": "Support",
+                        "status": "ready",
+                    }
+                ],
+            },
+        ),
+    )
+    route = _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/status"),
+        return_value=httpx.Response(
+            200,
+            json={"request_id": "req_status", "status": {"project": "ready"}},
+        ),
+    )
+
+    rc, out, err = run_cli(
+        ["--json", "--project", "Support", "projects", "status"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 0
+    assert err == ""
+    assert route.called
+    assert json.loads(out)["project"]["id"] == PROJECT_ID
 
 
 @ROUTE_CTX
@@ -1811,6 +1911,117 @@ def test_csv_import_uses_preview_columns_and_wait_polling(
 
 
 @ROUTE_CTX
+def test_csv_import_wait_returns_failure_when_poll_reaches_failed(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    csv_path = tmp_path / "documents.csv"
+    csv_path.write_text("id,title\n1,Hello\n", encoding="utf-8")
+    _stub_csv_direct_preview(
+        {"preview": {"job_id": IMPORT_ID, "columns": [{"name": "id", "type": "text"}]}}
+    )
+    _stub(
+        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_started",
+                "import": {"id": IMPORT_ID, "status": "running"},
+                "poll_interval_seconds": 1,
+            },
+        ),
+    )
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/{IMPORT_ID}"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_failed",
+                "import": {
+                    "id": IMPORT_ID,
+                    "status": "failed",
+                    "error_code": "IMPORT_RLS_WRITE_POLICY_REQUIRED",
+                    "error_message": "The target policy rejected the import.",
+                },
+            },
+        ),
+    )
+    monkeypatch.setattr("time.sleep", lambda seconds: None)
+
+    rc, out, err = run_cli(
+        ["--json", "import", "csv", str(csv_path), "--table", "documents", "--wait"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 1
+    assert err == ""
+    assert json.loads(out)["import"]["status"] == "failed"
+
+
+@ROUTE_CTX
+def test_csv_import_returns_failure_when_start_response_is_failed(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    csv_path = tmp_path / "documents.csv"
+    csv_path.write_text("id,title\n1,Hello\n", encoding="utf-8")
+    _stub_csv_direct_preview(
+        {"preview": {"job_id": IMPORT_ID, "columns": [{"name": "id", "type": "text"}]}}
+    )
+    _stub(
+        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_failed",
+                "import": {"id": IMPORT_ID, "status": "failed"},
+            },
+        ),
+    )
+
+    rc, out, err = run_cli(
+        ["--json", "import", "csv", str(csv_path), "--table", "documents"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 1
+    assert err == ""
+    assert json.loads(out)["import"]["status"] == "failed"
+
+
+@ROUTE_CTX
+def test_import_status_fails_closed_for_unknown_status(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/{IMPORT_ID}"),
+        return_value=httpx.Response(
+            200,
+            json={"request_id": "req_unknown", "import": {"id": IMPORT_ID, "status": "wat"}},
+        ),
+    )
+
+    rc, out, err = run_cli(
+        ["--json", "import", "status", IMPORT_ID], capsys, monkeypatch, tmp_path
+    )
+
+    assert rc == 1
+    assert err == ""
+    assert json.loads(out)["import"]["status"] == "wat"
+
+
+@ROUTE_CTX
 def test_failed_import_human_output_includes_error_context(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -2001,7 +2212,7 @@ def test_login_browser_fallback_polls_stores_tokens_and_redacts_output(
     assert ACCESS_TOKEN not in out
     assert REFRESH_TOKEN not in out
     assert json.loads(start_route.calls[0].request.content) == {
-        "client": {"name": "polygres-cli", "version": "0.2.0"}
+        "client": {"name": "polygres-cli", "version": __version__}
     }
     assert json.loads(poll_route.calls[0].request.content) == {
         "login_session_id": "cls_abcdefghijklmnopqrstuvwxyz",

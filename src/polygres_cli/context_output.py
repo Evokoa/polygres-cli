@@ -58,6 +58,38 @@ def context_capabilities_human(payload: dict[str, Any], *, verbose: bool) -> Non
     _request_id(payload, verbose)
 
 
+def context_onboarding_human(payload: dict[str, Any], *, verbose: bool) -> None:
+    candidates = _list(payload.get("candidates"))
+    print_kv(
+        [
+            ("Status", _display(payload.get("status"))),
+            ("Eligible pgvector sources", len(candidates)),
+            ("Offer acknowledged", "Yes" if payload.get("offer_acknowledged") else "No"),
+            ("Collection", _display(payload.get("completed_collection_id"))),
+        ]
+    )
+    if candidates:
+        sys.stdout.write("\n")
+        print_table(
+            [
+                {
+                    "ID": _display(item.get("vector_configuration_id")),
+                    "NAME": _display(item.get("name")),
+                    "SOURCE": (
+                        f"{_display(item.get('schema_name'))}."
+                        f"{_display(item.get('table_name'))}"
+                    ),
+                    "COLUMN": _display(item.get("embedding_column")),
+                    "DIMENSIONS": _display(item.get("dimensions")),
+                    "METRIC": _display(item.get("metric")),
+                }
+                for item in candidates
+            ],
+            ["ID", "NAME", "SOURCE", "COLUMN", "DIMENSIONS", "METRIC"],
+        )
+    _request_id(payload, verbose)
+
+
 def context_discovery_human(payload: dict[str, Any], *, verbose: bool) -> None:
     rows: list[dict[str, Any]] = []
     for candidate in _list(payload.get("candidates")):

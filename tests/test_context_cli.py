@@ -128,6 +128,7 @@ def test_context_help_registers_complete_tree_and_rejects_superseded_names(
     assert err == ""
     for command in (
         "capabilities",
+        "init",
         "sources",
         "collections",
         "filters",
@@ -157,6 +158,7 @@ def test_context_help_registers_complete_tree_and_rejects_superseded_names(
     "command",
     [
         ["capabilities"],
+        ["init"],
         ["sources", "discover"],
         ["sources", "preflight", "--file", "request.json"],
         ["collections", "list"],
@@ -290,6 +292,81 @@ def test_capabilities_uses_selected_project_auth_and_exact_json(
     assert err == ""
     assert json.loads(out) == payload
     assert route.calls[0].request.headers["Authorization"] == f"Bearer {ACCESS_TOKEN}"
+
+
+@ROUTE_CTX
+def test_context_init_reuses_one_eligible_pgvector_column(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    vector_configuration_id = "323e4567-e89b-12d3-a456-426614174000"
+    onboarding = {
+        "request_id": "req_onboarding",
+        "status": "eligible",
+        "compatibility_generation": 1,
+        "candidates": [
+            {
+                "vector_configuration_id": vector_configuration_id,
+                "name": "articles",
+                "schema_name": "public",
+                "table_name": "articles",
+                "row_id_column": "id",
+                "embedding_column": "embedding",
+                "dimensions": 1536,
+                "metric": "cosine",
+                "is_default": True,
+            }
+        ],
+        "offer_acknowledged": False,
+        "selected_vector_configuration_id": None,
+        "completed_collection_id": None,
+        "evaluated_at": "2026-08-06T00:00:00Z",
+        "updated_at": "2026-08-06T00:00:00Z",
+    }
+    evaluate = respx.post(
+        f"{API_BASE_URL}/projects/{PROJECT_ID}/context/onboarding/evaluate"
+    ).mock(return_value=httpx.Response(200, json=onboarding))
+    acknowledge = respx.post(
+        f"{API_BASE_URL}/projects/{PROJECT_ID}/context/onboarding/acknowledge"
+    ).mock(return_value=httpx.Response(200, json={**onboarding, "offer_acknowledged": True}))
+    create = respx.post(
+        f"{API_BASE_URL}/projects/{PROJECT_ID}/context/collections"
+    ).mock(return_value=httpx.Response(202, json=response()))
+
+    rc, out, err = run_cli(
+        context_args("init", "--yes", "--no-wait"),
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 0
+    assert err == ""
+    assert json.loads(out)["operation"]["id"] == OPERATION_ID
+    assert evaluate.called and acknowledge.called and create.called
+    assert json.loads(create.calls[0].request.content) == {
+        "name": "articles_context",
+        "source": {
+            "mode": "existing",
+            "schema_name": "public",
+            "table_name": "articles",
+            "source_key_column": "id",
+            "content_column": None,
+            "metadata_column": None,
+        },
+        "vector": {
+            "column_name": "embedding",
+            "dimensions": 1536,
+            "metric": "cosine",
+        },
+        "text_column": None,
+        "result_columns": [],
+        "filter_columns": [],
+        "jsonb_filter_paths": [],
+        "index_kind": "hnsw",
+        "max_search_limit": 1000,
+    }
 
 
 def test_context_requires_project_and_login(
@@ -1708,3 +1785,54 @@ def test_operation_wait_and_retry_follow_terminal_operation_envelopes(
     assert err == ""
     assert json.loads(out) == terminal_retry
     assert retry_get.call_count == 1
+
+
+@pytest.mark.parametrize("action", ["cancel", "retry"])
+@ROUTE_CTX
+def test_lifecycle_conflict_is_a_nonretryable_structured_cli_error(
+    action: str,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    route = respx.post(
+        f"{API_BASE_URL}/projects/{PROJECT_ID}/context/operations/{OPERATION_ID}/{action}"
+    ).mock(
+        return_value=httpx.Response(
+            409,
+            json={
+                "request_id": "req_lifecycle_conflict",
+                "error": {
+                    "code": "CONTEXT_OPERATION_STATE_CONFLICT",
+                    "message": "The operation state does not allow this action.",
+                    "details": {"status": "succeeded"},
+                },
+            },
+        )
+    )
+
+    rc, out, err = run_cli(
+        context_args(
+            "operations",
+            action,
+            OPERATION_ID,
+            "--idempotency-key",
+            "stable-lifecycle-key",
+            "--no-wait",
+        ),
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 6
+    assert err == ""
+    assert route.call_count == 1
+    assert route.calls[0].request.headers["Idempotency-Key"] == "stable-lifecycle-key"
+    rendered = json.loads(out)
+    assert rendered["request_id"] == "req_lifecycle_conflict"
+    assert rendered["error"] == {
+        "code": "CONTEXT_OPERATION_STATE_CONFLICT",
+        "message": "The operation state does not allow this action.",
+        "details": {"status": "succeeded"},
+    }

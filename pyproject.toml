@@ -33,7 +33,7 @@ polygres = "polygres_cli.cli:main"
 
 [project.urls]
 Homepage = "https://polygres.com"
-Documentation = "https://docs.evokoa.com/polygres"
+Documentation = "https://docs.polygres.com/cli"
 Repository = "https://github.com/Evokoa/polygres-cli"
 Changelog = "https://github.com/Evokoa/polygres-cli/blob/main/CHANGELOG.md"
 Issues = "https://github.com/Evokoa/polygres-cli/issues"

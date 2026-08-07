@@ -46,17 +46,19 @@ Publishing uses GitHub Actions Trusted Publishing. Validate first through
 TestPyPI, then publish a matching `python-cli-vX.Y.Z` tag from the public CLI
 repository. Do not add PyPI API tokens to GitHub secrets.
 
-Before syncing a release to the public CLI repository:
+`pyproject.toml` is the only release-version source. The installed CLI reads
+that distribution metadata for `polygres --version`, login metadata, notices,
+and request headers. Before syncing a release to the public CLI repository:
 
 1. Add the release notes and date to `CHANGELOG.md`.
-2. Update the version in `pyproject.toml` and
-   `src/polygres_cli/cli_client.py`.
-3. Update version assertions in the test suite and public installation
-   documentation.
-4. Run `pytest`, `ruff check .`, `python -m build`, and
+2. Update the version in `pyproject.toml`.
+3. Update public installation documentation that names the released version.
+4. Run `pytest`, `ruff check .`, `python tools/verify_release_version.py`,
+   `python -m build`, and
    `python -m twine check dist/*`.
 5. Validate the release through TestPyPI before creating the matching
-   production tag.
+   `python-cli-vX.Y.Z` production tag. The release workflow rejects a tag that
+   does not exactly match the package version.
 
 ## Scope
 

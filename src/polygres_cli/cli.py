@@ -19,6 +19,7 @@ from polygres_cli._vendor.polygres_lib.context import (
     CollectionCreateRequest,
     CollectionUpdateRequest,
     ContextJointResponse,
+    ContextOnboardingResponse,
     CountRequest,
     DenseSearchRequest,
     DiscoveryRequest,
@@ -34,6 +35,7 @@ from polygres_cli._vendor.polygres_lib.context import (
     TextHybridSearchRequest,
     VectorFirstSearchRequest,
 )
+from polygres_cli._version import __version__
 from polygres_cli.api_openapi import (
     HTTP_METHODS,
     api_route_rows,
@@ -43,7 +45,7 @@ from polygres_cli.api_openapi import (
     resolve_api_operation,
 )
 from polygres_cli.cli_auth import clear_auth, validate_start_response, validated_approved_auth
-from polygres_cli.cli_client import VERSION, CliControlPlaneClient
+from polygres_cli.cli_client import CliControlPlaneClient
 from polygres_cli.cli_config import (
     DEFAULT_API_BASE_URL,
     ConfigStore,
@@ -97,6 +99,7 @@ from polygres_cli.context_output import (
     context_facets_human,
     context_filters_human,
     context_joint_human,
+    context_onboarding_human,
     context_operation_human,
     context_operations_list_human,
     context_point_mutation_human,
@@ -148,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = parser.parse_args(argv)
         if getattr(args, "version", False):
-            sys.stdout.write(f"polygres {VERSION}\n")
+            sys.stdout.write(f"polygres {__version__}\n")
             _display_post_command_notices(force_refresh=True)
             return SUCCESS
         if not hasattr(args, "func"):
@@ -264,7 +267,7 @@ def _add_projects_parsers(subparsers: argparse._SubParsersAction[argparse.Argume
     create_parser.add_argument("--timeout", type=_timeout_seconds, default=600)
     create_parser.set_defaults(func=handle_projects_create)
     status_parser = sub.add_parser("status", help="show project status")
-    status_parser.add_argument("project", nargs="?")
+    status_parser.add_argument("status_project", nargs="?", metavar="project")
     status_parser.set_defaults(func=handle_projects_status)
 
 
@@ -470,6 +473,16 @@ def _add_context_parsers(
 
     capabilities = sub.add_parser("capabilities", help="inspect Context capabilities")
     capabilities.set_defaults(func=handle_context_capabilities)
+
+    init = sub.add_parser(
+        "init", help="reuse an eligible pgvector embedding column with pgContext"
+    )
+    init.add_argument("--refresh", action="store_true")
+    init.add_argument("--candidate", help="vector configuration UUID")
+    init.add_argument("--name", help="Context collection name")
+    init.add_argument("--yes", action="store_true")
+    _add_context_operation_flags(init)
+    init.set_defaults(func=handle_context_init)
 
     sources = sub.add_parser("sources", help="discover and preflight Context sources")
     sources_sub = sources.add_subparsers(dest="sources_action", required=True)
@@ -760,7 +773,7 @@ def _add_config_parsers(subparsers: argparse._SubParsersAction[argparse.Argument
 
 
 def handle_login(ctx: Context, args: argparse.Namespace) -> int:
-    started = ctx.client.start_login({"name": "polygres-cli", "version": VERSION})
+    started = ctx.client.start_login({"name": "polygres-cli", "version": __version__})
     session_id, browser_url, poll_token, expires_at, interval = validate_start_response(started)
     opened = False
     try:
@@ -928,7 +941,7 @@ def handle_projects_create(ctx: Context, args: argparse.Namespace) -> int:
 
 
 def handle_projects_status(ctx: Context, args: argparse.Namespace) -> int:
-    project_id = _resolve_project_id(ctx, args.project)
+    project_id = _resolve_project_id(ctx, args.status_project)
     payload = ctx.client.get_project_status(project_id)
     output = _project_status_output(project_id, payload)
     return _emit(
@@ -1617,6 +1630,91 @@ def handle_context_capabilities(ctx: Context, args: argparse.Namespace) -> int:
     return _context_emit(ctx, payload, context_capabilities_human)
 
 
+def handle_context_init(ctx: Context, args: argparse.Namespace) -> int:
+    project_id = _resolve_project_id(ctx, None)
+    action = "refresh" if args.refresh else "evaluate"
+    payload = ctx.client.context_onboarding_action(project_id, action)
+    onboarding = context_response_model(ContextOnboardingResponse, payload)
+    status_value = (
+        onboarding.status.value
+        if hasattr(onboarding.status, "value")
+        else onboarding.status
+    )
+    status = str(status_value)
+    if status in {"completed", "dismissed", "ineligible"}:
+        return _context_emit(ctx, payload, context_onboarding_human)
+
+    candidates = [candidate.model_dump(mode="json") for candidate in onboarding.candidates]
+    if not candidates:
+        return _context_emit(ctx, payload, context_onboarding_human)
+    selected = _context_onboarding_candidate(candidates, args.candidate)
+    ctx.client.context_onboarding_action(project_id, "acknowledge")
+
+    if not args.yes:
+        if ctx.json or not sys.stdin.isatty():
+            return _context_emit(ctx, payload, context_onboarding_human)
+        sys.stderr.write(
+            "Reuse "
+            f"{selected['schema_name']}.{selected['table_name']}."
+            f"{selected['embedding_column']} for pgContext? [y/N] "
+        )
+        if sys.stdin.readline().strip().lower() not in {"y", "yes"}:
+            dismissed = ctx.client.context_onboarding_action(project_id, "dismiss")
+            return _context_emit(ctx, dismissed, context_onboarding_human)
+
+    collection_name = args.name or f"{selected['table_name']}_context"[:63]
+    context_validate_identifier(collection_name, field="name")
+    request = context_model_payload(
+        CollectionCreateRequest,
+        {
+            "name": collection_name,
+            "source": {
+                "mode": "existing",
+                "schema_name": selected["schema_name"],
+                "table_name": selected["table_name"],
+                "source_key_column": selected["row_id_column"],
+            },
+            "vector": {
+                "column_name": selected["embedding_column"],
+                "dimensions": selected["dimensions"],
+                "metric": selected["metric"],
+            },
+            "index_kind": "hnsw",
+        },
+    )
+    key = context_idempotency_key(args.idempotency_key)
+    operation = ctx.client.context_collections_create(
+        project_id,
+        request,
+        idempotency_key=key,
+    )
+    return _context_mutation_result(ctx, args, project_id, operation, key)
+
+
+def _context_onboarding_candidate(
+    candidates: list[dict[str, Any]], candidate_id: str | None
+) -> dict[str, Any]:
+    if candidate_id is not None:
+        context_validate_uuid(candidate_id, field="candidate")
+        matches = [
+            item for item in candidates if str(item["vector_configuration_id"]) == candidate_id
+        ]
+        if matches:
+            return matches[0]
+        raise CliError(
+            "CONTEXT_ONBOARDING_NOT_ELIGIBLE",
+            "The selected vector configuration is not an eligible bridge candidate.",
+            exit_code=CONFLICT,
+        )
+    if len(candidates) == 1:
+        return candidates[0]
+    raise CliError(
+        "CONTEXT_ONBOARDING_CANDIDATE_REQUIRED",
+        "Multiple eligible vector configurations were found. Pass --candidate <uuid>.",
+        exit_code=USAGE,
+    )
+
+
 def handle_context_sources_discover(ctx: Context, args: argparse.Namespace) -> int:
     schemas = context_deduplicate(args.schema)
     for index, schema in enumerate(schemas):
@@ -2063,7 +2161,7 @@ def handle_config_path(ctx: Context, args: argparse.Namespace) -> int:
 def handle_notices(ctx: Context, args: argparse.Namespace) -> int:
     display_notices_safely(
         base_url=resolve_api_base_url(ctx.config),
-        cli_version=VERSION,
+        cli_version=__version__,
         force_refresh=True,
         ignore_display_policy=True,
         show_empty=True,
@@ -2084,7 +2182,7 @@ def _display_post_command_notices(
             base_url = os.environ.get("POLYGRES_API_BASE_URL") or DEFAULT_API_BASE_URL
     display_notices_safely(
         base_url=base_url,
-        cli_version=VERSION,
+        cli_version=__version__,
         force_refresh=force_refresh,
     )
 
@@ -2857,7 +2955,9 @@ def _import_exit_code(item: dict[str, Any]) -> int:
         return GENERAL_FAILURE
     if status == "cancelled":
         return CONFLICT
-    return SUCCESS
+    if status in {"queued", "running"}:
+        return SUCCESS
+    return GENERAL_FAILURE
 
 
 def _latest_import_id(imports: list[dict[str, Any]]) -> str | None:

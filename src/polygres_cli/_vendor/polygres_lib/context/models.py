@@ -18,6 +18,7 @@ from .enums import (
     ContextMetric,
     ContextOperationKind,
     ContextOperationStatus,
+    ContextOnboardingStatus,
     ContextPointReconciliationStatus,
     ContextRankedMode,
     ContextRecallStatus,
@@ -485,6 +486,10 @@ class RuntimeCapabilities(ContextResponse):
     pgcontext_source_commit: str | None
     pgvector_installed: bool
     pgcontext_installed: bool
+    pgvector_version: str | None = None
+    pgvector_schema: str | None = None
+    pgcontext_pgvector_version: str | None = None
+    same_column_bridge: bool = False
 
 
 class CapabilitiesResponse(ContextResponse):
@@ -579,6 +584,30 @@ class DiscoveryResponse(ContextResponse):
     candidates: list[DiscoveryCandidate]
 
 
+class ContextOnboardingCandidate(ContextResponse):
+    vector_configuration_id: UUID
+    name: str
+    schema_name: str
+    table_name: str
+    row_id_column: str
+    embedding_column: str
+    dimensions: int
+    metric: ContextMetric
+    is_default: bool
+
+
+class ContextOnboardingResponse(ContextResponse):
+    request_id: str
+    status: ContextOnboardingStatus | str
+    compatibility_generation: int
+    candidates: list[ContextOnboardingCandidate]
+    offer_acknowledged: bool
+    selected_vector_configuration_id: UUID | None
+    completed_collection_id: UUID | None
+    evaluated_at: datetime | None
+    updated_at: datetime | None
+
+
 class PreflightCheck(ContextResponse):
     code: str
     status: str
@@ -625,6 +654,7 @@ class ContextCollection(ContextResponse):
     owns_vector_column: bool
     vector_name: str
     vector_column: str
+    vector_type_owner: Literal["pgcontext", "pgvector"] = "pgcontext"
     dimensions: int
     metric: ContextMetric
     max_search_limit: int
@@ -1086,6 +1116,7 @@ RESPONSE_MODEL_TYPES = (
     ErrorEnvelope,
     CapabilitiesResponse,
     DiscoveryResponse,
+    ContextOnboardingResponse,
     PreflightResponse,
     ContextCollection,
     CollectionListResponse,
@@ -1120,6 +1151,7 @@ NESTED_RESPONSE_MODEL_TYPES = (
     DiscoverySource,
     DiscoveryVector,
     DiscoveryCandidate,
+    ContextOnboardingCandidate,
     PreflightCheck,
     PreflightBlocker,
     PreflightOwnership,

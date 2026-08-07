@@ -44,6 +44,14 @@ class ContextPointReconciliationStatus(str, Enum):
     FAILED = "failed"
 
 
+class ContextOnboardingStatus(str, Enum):
+    UNASSESSED = "unassessed"
+    ELIGIBLE = "eligible"
+    DISMISSED = "dismissed"
+    COMPLETED = "completed"
+    INELIGIBLE = "ineligible"
+
+
 class ContextSourceClassification(str, Enum):
     READY_TO_CONFIGURE = "ready_to_configure"
     NEEDS_SETUP = "needs_setup"
@@ -267,6 +275,7 @@ __all__ = [
     "ContextMetric",
     "ContextOperationKind",
     "ContextOperationStatus",
+    "ContextOnboardingStatus",
     "ContextPointReconciliationStatus",
     "ContextRankedMode",
     "ContextRecallStatus",
