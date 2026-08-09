@@ -4,10 +4,24 @@ All notable changes to `polygres-cli` are documented in this file.
 
 ## Unreleased
 
+## 0.2.1 - 2026-08-09
+
+### Added
+
+- Added `polygres context init` for reusing eligible pgvector embedding columns
+  with pgContext.
+- Bundled Runtime API contracts now cover multiple named vectors per Context
+  collection.
+
 ### Changed
 
 - `polygres vector configs create` now returns a migration error directing users to
   `polygres context collections create`.
+
+### Fixed
+
+- Project status commands now consistently honor the global `--project` option.
+- Release validation now supports Python 3.10 through its compatible TOML parser.
 
 ## 0.2.0 - 2026-08-08
 
@@ -28,7 +42,6 @@ All notable changes to `polygres-cli` are documented in this file.
 - Graph and vector activation failures now return nonzero exit codes.
 - Authentication errors no longer expose internal service details.
 - CSV imports now work with destination tables protected by row-level security.
-- Project status commands now consistently honor the global `--project` option.
 
 ## 0.1.2 - 2026-07-14
 

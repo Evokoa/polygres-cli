@@ -28,6 +28,8 @@ def run_cli(
     token: str | None = ACCESS_TOKEN,
 ) -> tuple[int, str, str]:
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.delenv("POLYGRES_CONFIG_PATH", raising=False)
     monkeypatch.setenv("POLYGRES_API_BASE_URL", API_BASE_URL)
     if token is None:
         monkeypatch.delenv("POLYGRES_ACCESS_TOKEN", raising=False)
