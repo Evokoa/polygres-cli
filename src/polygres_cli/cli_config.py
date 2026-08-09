@@ -13,6 +13,12 @@ CONFIG_VERSION = 1
 
 
 def default_config_path() -> Path:
+    explicit_path = os.environ.get("POLYGRES_CONFIG_PATH")
+    if explicit_path:
+        return Path(explicit_path).expanduser()
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
+    if xdg_config_home:
+        return Path(xdg_config_home).expanduser() / "polygres" / "config.json"
     return Path.home() / ".config" / "polygres" / "config.json"
 
 

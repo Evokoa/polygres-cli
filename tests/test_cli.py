@@ -16,7 +16,7 @@ import respx
 from polygres_cli import __version__, cli, cli_client
 from polygres_cli.cli_auth import normalize_poll_response, validate_start_response
 from polygres_cli.cli_client import CliControlPlaneClient
-from polygres_cli.cli_config import ConfigStore
+from polygres_cli.cli_config import ConfigStore, default_config_path
 from polygres_cli.cli_secrets import redact
 
 PROJECT_ID = "p0123456789abcdef0123456"
@@ -141,6 +141,28 @@ def test_version_and_config_path_json(
     rc, out, _ = run_cli(["--json", "config", "path"], capsys, monkeypatch, tmp_path)
     assert rc == 0
     assert json.loads(out) == {"path": str(tmp_path / ".config" / "polygres" / "config.json")}
+
+
+def test_config_path_honors_xdg_config_home(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    isolated_root = tmp_path / "staging-config"
+    monkeypatch.delenv("POLYGRES_CONFIG_PATH", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(isolated_root))
+
+    assert default_config_path() == isolated_root / "polygres" / "config.json"
+
+
+def test_explicit_config_path_overrides_xdg_config_home(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    explicit_path = tmp_path / "staging-polygres.json"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "ignored-xdg"))
+    monkeypatch.setenv("POLYGRES_CONFIG_PATH", str(explicit_path))
+
+    assert default_config_path() == explicit_path
 
 
 def test_invalid_command_returns_json_usage_error(
@@ -1169,7 +1191,11 @@ def test_local_validation_failures_do_not_send_http_requests(
 
     assert rc == 2
     assert err == ""
-    assert json.loads(out)["error"]["code"] in {"VALIDATION_ERROR", "CONFIRMATION_REQUIRED"}
+    assert json.loads(out)["error"]["code"] in {
+        "VALIDATION_ERROR",
+        "CONFIRMATION_REQUIRED",
+        "VECTOR_CREATION_RETIRED",
+    }
     assert len(respx.calls) == 0
 
 
@@ -1442,6 +1468,7 @@ def test_db_psql_missing_prints_passwordless_command_and_exits_9(
 
     assert rc == 9
     assert err == ""
+    assert "PGAPPNAME=polygres-cli" in out
     assert "PGSSLMODE=require psql --host direct.example" in out
     assert "PGPASSWORD" not in out
 
@@ -1495,6 +1522,7 @@ def test_db_psql_removes_pgpassword_from_child_environment(
     assert err == ""
     child_env = captured["env"]
     assert isinstance(child_env, dict)
+    assert child_env["PGAPPNAME"] == "polygres-cli"
     assert child_env["PGSSLMODE"] == "require"
     assert "PGPASSWORD" not in child_env
 
@@ -1571,24 +1599,12 @@ def test_migrations_apply_rejects_invalid_explicit_name_without_normalizing(
 
 
 @ROUTE_CTX
-def test_vector_create_validates_dimensions_and_payload(
+def test_vector_create_directs_users_to_pgcontext_without_calling_api(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
-    route = _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/vector/configurations"),
-        return_value=httpx.Response(
-            200,
-            json={
-                "request_id": "req_vector",
-                "configuration": {"id": CONFIG_ID, "name": "docs", "index_status": "missing"},
-                "operation": {"created": True},
-            },
-        ),
-    )
-
     rc, out, err = run_cli(
         [
             "--json",
@@ -1612,21 +1628,28 @@ def test_vector_create_validates_dimensions_and_payload(
         tmp_path,
     )
 
-    assert rc == 0
+    assert rc == 2
     assert err == ""
-    assert json.loads(route.calls[0].request.content) == {
-        "name": "docs",
-        "schema_name": "public",
-        "table_name": "documents",
-        "row_id_column": "id",
-        "embedding_column": "embedding",
-        "dimensions": 1536,
-        "metric": "cosine",
-        "metadata_columns": ["title"],
-        "filter_columns": ["tenant_id"],
-        "index_kind": "hnsw",
+    payload = json.loads(out)
+    assert payload["error"]["code"] == "VECTOR_CREATION_RETIRED"
+    assert payload["error"]["details"] == {
+        "replacement": "pgcontext_collection",
+        "command": "polygres context collections create",
     }
-    assert json.loads(out)["configuration"]["id"] == CONFIG_ID
+    assert "pgcontext.vector" in payload["error"]["message"]
+    assert len(respx.calls) == 0
+
+    rc, out, err = run_cli(
+        ["vector", "configs", "create"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+    assert rc == 2
+    assert out == ""
+    assert "New pgvector column registrations are no longer supported" in err
+    assert "polygres context collections create" in err
+    assert len(respx.calls) == 0
 
     rc, out, _ = run_cli(
         [
@@ -1647,7 +1670,7 @@ def test_vector_create_validates_dimensions_and_payload(
         tmp_path,
     )
     assert rc == 2
-    assert json.loads(out)["error"]["code"] == "VALIDATION_ERROR"
+    assert json.loads(out)["error"]["code"] == "VECTOR_CREATION_RETIRED"
 
 
 @ROUTE_CTX
@@ -3269,3 +3292,32 @@ def test_heavy_graph_build_request_uses_extended_read_timeout() -> None:
 
     timeout = route.calls[0].request.extensions["timeout"]
     assert timeout["read"] >= 120.0
+@ROUTE_CTX
+def test_cli_requests_include_command_correlation_headers(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    projects_route = _stub(
+        respx.get(f"{API_BASE_URL}/projects"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req-projects",
+                "projects": [{"id": PROJECT_ID, "name": "Support"}],
+            },
+        ),
+    )
+    rc, _out, _err = run_cli(
+        ["--project", PROJECT_ID, "projects", "list"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 0
+    assert projects_route.call_count == 1
+    project_request = projects_route.calls[0].request
+    command_id = project_request.headers["x-polygres-command-id"]
+    assert cli.UUID_LIKE_RE.fullmatch(command_id)
+    assert project_request.headers["x-polygres-command-name"] == "projects.list"

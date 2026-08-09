@@ -49,6 +49,17 @@ def test_release_versions_match_current_distribution() -> None:
     assert set(values.values()) == {expected}
 
 
+def test_release_documentation_names_current_cli_version() -> None:
+    root = Path(__file__).parents[1]
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+
+    assert "Package version: [`0.2.0`]" in readme
+    assert "python-cli-v0.2.0" in readme
+    assert "CLI 0.2.0 release notes" in readme
+    assert "## 0.2.0 - 2026-08-08" in changelog
+
+
 @pytest.mark.parametrize(
     "tag",
     (

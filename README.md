@@ -55,9 +55,56 @@ polygres vector configs list
 polygres text configs list
 ```
 
+Creating new pgvector configurations is retired. Use
+`polygres context collections create` to create a pgContext collection and native
+`pgcontext.vector` column. Existing vector configuration list, retrieval, and lifecycle
+commands remain available for previously registered columns.
+
+### Work with pgContext AI Search
+
+pgContext uses named collections and is the supported path for new vector setup.
+
+```bash
+polygres context capabilities
+polygres context sources discover
+polygres context collections create support_docs \
+  --source new-table \
+  --table support_docs \
+  --dimensions 768
+polygres context search support_docs \
+  --embedding-file query-embedding.json
+```
+
+Commands that change a collection wait for the server operation to finish by default. Use `--no-wait` to return as soon as the operation is accepted.
+
+Global options must come before the command namespace:
+
+```bash
+polygres --project <project-id> --json context collections list
+```
+
+## Use additional API routes
+
+The `api` commands give automation access to supported project-management routes that do not yet have a dedicated high-level command.
+
+```bash
+polygres api routes
+polygres --json api routes --method GET
+polygres --json --project <project-id> api request \
+  /projects/{project_id} \
+  --method GET \
+  --dry-run
+```
+
+The CLI validates the route, HTTP method, parameters, and JSON body against its bundled API specification before sending the request. Run with `--dry-run` to inspect a request without executing it.
+
+## Notices and automation
+
+Service and release notices are written to standard error, so standard output and `--json` remain safe for scripts. The CLI never sends command arguments or command output when checking for notices.
+
 ## Version and support
 
-The current published CLI release is [`0.1.2`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.1.2).
+Package version: [`0.2.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.2.0).
 
 Useful commands:
 
@@ -76,4 +123,4 @@ Users of the former combined `polygres` package should install both packages sep
 
 ## Changelog
 
-See the [CLI 0.1.2 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.1.2) for published changes.
+See the [CLI 0.2.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.2.0) for release changes.

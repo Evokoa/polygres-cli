@@ -29,12 +29,14 @@ class RuntimeClient:
         now: Callable[[], datetime] | None = None,
         max_retries: int = 2,
         allow_local_http: bool = False,
+        telemetry_headers: dict[str, str] | None = None,
     ) -> None:
         self._grant_provider = grant_provider
         self._client = http_client
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._max_retries = max_retries
         self._allow_local_http = allow_local_http
+        self._telemetry_headers = dict(telemetry_headers or {})
         self._grants: dict[tuple[str, str], dict[str, Any]] = {}
 
     def clear(self) -> None:
@@ -67,6 +69,7 @@ class RuntimeClient:
             headers = {
                 "Accept": "application/json",
                 "Authorization": f"Bearer {grant['access_token']}",
+                **self._telemetry_headers,
             }
             if json is not None:
                 headers["Content-Type"] = "application/json"

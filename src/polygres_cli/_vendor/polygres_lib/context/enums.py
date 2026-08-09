@@ -88,6 +88,7 @@ class ContextOperationKind(str, Enum):
     COLLECTION_UPDATE = "collection_update"
     COLLECTION_DELETE = "collection_delete"
     COLLECTION_REINDEX = "collection_reindex"
+    VECTOR_ADD = "vector_add"
     FILTER_ADD_COLUMN = "filter_add_column"
     FILTER_ADD_JSONB_PATH = "filter_add_jsonb_path"
     POINTS_UPSERT = "points_upsert"
@@ -171,6 +172,18 @@ CONTEXT_OPERATION_STAGES: dict[ContextOperationKind, tuple[str, ...]] = {
         "registering_filters",
         "syncing_points",
         "reconciling_points",
+        "building_index",
+        "attaching_index",
+        "verifying",
+        "ready",
+        "failed",
+        "cancelled",
+    ),
+    ContextOperationKind.VECTOR_ADD: (
+        "queued",
+        "validating_vector",
+        "creating_vector_column",
+        "registering_vector",
         "building_index",
         "attaching_index",
         "verifying",

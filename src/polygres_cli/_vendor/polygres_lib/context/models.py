@@ -106,15 +106,23 @@ class ContextSourceRequest(ContextRequest):
 
 
 class ContextVectorRequest(ContextRequest):
+    name: str | None = None
     column_name: str = "embedding"
     dimensions: int = Field(ge=1, le=16_000)
     metric: ContextMetric = ContextMetric.COSINE
 
-    @field_validator("column_name")
+    @field_validator("name", "column_name")
     @classmethod
-    def _column(cls, value: str) -> str:
-        require_valid(validate_identifier(value, field="column_name"))
+    def _column(cls, value: str | None, info) -> str | None:
+        if value is not None:
+            require_valid(validate_identifier(value, field=info.field_name))
         return value
+
+
+class ContextVectorCreateRequest(ContextVectorRequest):
+    mode: Literal["existing", "add_column"] = "existing"
+    index_kind: ContextIndexKind = ContextIndexKind.HNSW
+    set_default: bool = False
 
 
 class JsonbFilterPathRequest(ContextRequest):
@@ -185,12 +193,20 @@ class CollectionUpdateRequest(ContextRequest):
     text_column: str | None = None
     result_columns: list[str] | None = Field(default=None, max_length=32)
     max_search_limit: int | None = Field(default=None, ge=1, le=1_000)
+    default_vector_name: str | None = None
 
     @field_validator("text_column")
     @classmethod
     def _text_column(cls, value: str | None) -> str | None:
         if value is not None:
             require_valid(validate_identifier(value, field="text_column"))
+        return value
+
+    @field_validator("default_vector_name")
+    @classmethod
+    def _default_vector_name(cls, value: str | None) -> str | None:
+        if value is not None:
+            require_valid(validate_identifier(value, field="default_vector_name"))
         return value
 
     @field_validator("result_columns")
@@ -271,6 +287,7 @@ class FacetsRequest(CountRequest):
 
 
 class DenseSearchRequest(CountRequest):
+    vector_name: str | None = None
     embedding: list[float]
     limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
 
@@ -280,9 +297,17 @@ class DenseSearchRequest(CountRequest):
         require_valid(validate_embedding(value))
         return value
 
+    @field_validator("vector_name")
+    @classmethod
+    def _vector_name(cls, value: str | None) -> str | None:
+        if value is not None:
+            require_valid(validate_identifier(value, field="vector_name"))
+        return value
+
 
 class GroupedSearchRequest(ContextRequest):
     collection: str
+    vector_name: str | None = None
     embedding: list[float]
     group_by: str
     group_limit: int = Field(default=1, ge=1, le=MAX_RANKED_LIMIT)
@@ -300,6 +325,13 @@ class GroupedSearchRequest(ContextRequest):
         require_valid(validate_identifier(value, field="group_by"))
         return value
 
+    @field_validator("vector_name")
+    @classmethod
+    def _vector_name(cls, value: str | None) -> str | None:
+        if value is not None:
+            require_valid(validate_identifier(value, field="vector_name"))
+        return value
+
 
 class RecallCheckRequest(DenseSearchRequest):
     minimum_recall: float = 0.95
@@ -313,6 +345,7 @@ class RecallCheckRequest(DenseSearchRequest):
 
 class TextHybridSearchRequest(ContextRequest):
     collection: str
+    vector_name: str | None = None
     embedding: list[float]
     query: str = Field(min_length=1)
     limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
@@ -321,6 +354,13 @@ class TextHybridSearchRequest(ContextRequest):
     @classmethod
     def _embedding(cls, value: list[float]) -> list[float]:
         require_valid(validate_embedding(value))
+        return value
+
+    @field_validator("vector_name")
+    @classmethod
+    def _vector_name(cls, value: str | None) -> str | None:
+        if value is not None:
+            require_valid(validate_identifier(value, field="vector_name"))
         return value
 
 
@@ -639,6 +679,25 @@ class PreflightResponse(ContextResponse):
     ownership: PreflightOwnership
 
 
+class ContextCollectionVector(ContextResponse):
+    id: UUID
+    name: str
+    column_name: str
+    is_default: bool
+    owns_vector_column: bool
+    vector_type_owner: Literal["pgcontext", "pgvector"] = "pgcontext"
+    dimensions: int
+    metric: ContextMetric
+    index_kind: ContextIndexKind
+    index_name: str | None
+    owns_index: bool
+    index_status: ContextIndexStatus | str
+    last_error_code: str | None
+    last_error_stage: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ContextCollection(ContextResponse):
     id: UUID
     project_id: str
@@ -651,21 +710,13 @@ class ContextCollection(ContextResponse):
     source_key_type: str
     source_mode: ContextSourceMode
     owns_source_table: bool
-    owns_vector_column: bool
-    vector_name: str
-    vector_column: str
-    vector_type_owner: Literal["pgcontext", "pgvector"] = "pgcontext"
-    dimensions: int
-    metric: ContextMetric
+    default_vector_name: str
+    vectors: list[ContextCollectionVector]
     max_search_limit: int
     text_column: str | None
     result_columns: list[str]
     filter_columns: list[str]
     jsonb_filter_paths: list[dict[str, Any]]
-    index_kind: ContextIndexKind
-    index_name: str | None
-    owns_index: bool
-    index_status: ContextIndexStatus | str
     point_reconciliation_status: ContextPointReconciliationStatus | str
     mapped_point_count: int | None
     last_reconciled_at: datetime | None
@@ -684,9 +735,9 @@ class CollectionListResponse(ContextResponse):
 
 class DeletionPlan(ContextResponse):
     pgcontext_collection: str
-    drop_owned_index: str | None
+    drop_owned_indexes: list[str]
     preserve_source_table: str
-    preserve_source_column: str
+    preserve_source_columns: list[str]
     preserve_indexes: list[str]
 
 
@@ -738,7 +789,7 @@ class CollectionStatusResponse(ContextResponse):
     collection_name: str
     status: ContextCollectionStatus | str
     serving_status: ContextServingStatus | str
-    index_status: ContextIndexStatus | str
+    vectors: list[ContextCollectionVector]
     point_reconciliation_status: ContextPointReconciliationStatus | str
     mapped_point_count: int | None
     last_reconciled_at: datetime | None
@@ -1089,6 +1140,7 @@ REQUEST_MODEL_TYPES = (
     DiscoveryRequest,
     ContextSourceRequest,
     ContextVectorRequest,
+    ContextVectorCreateRequest,
     JsonbFilterPathRequest,
     CollectionCreateRequest,
     CollectionSetDefaultRequest,
@@ -1155,6 +1207,7 @@ NESTED_RESPONSE_MODEL_TYPES = (
     PreflightCheck,
     PreflightBlocker,
     PreflightOwnership,
+    ContextCollectionVector,
     DeletionPlan,
     ContextOperationFailure,
     VerificationCheck,

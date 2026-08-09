@@ -684,6 +684,7 @@
         }
       ],
       "traversal_limit": 500,
+      "vector_name": null,
       "weights": {
         "graph": 0.4,
         "lexical": 0.2,
@@ -914,7 +915,8 @@
       "vector": {
         "column_name": "embedding",
         "dimensions": 3,
-        "metric": "cosine"
+        "metric": "cosine",
+        "name": null
       }
     },
     "CollectionDeleteRequest": {
@@ -924,6 +926,7 @@
       "is_default": true
     },
     "CollectionUpdateRequest": {
+      "default_vector_name": null,
       "max_search_limit": 100,
       "result_columns": null,
       "text_column": null
@@ -936,10 +939,20 @@
       "source_key_column": "id",
       "table_name": "pgcontext_fixture_documents"
     },
+    "ContextVectorCreateRequest": {
+      "column_name": "embedding",
+      "dimensions": 1,
+      "index_kind": "hnsw",
+      "metric": "cosine",
+      "mode": "existing",
+      "name": null,
+      "set_default": false
+    },
     "ContextVectorRequest": {
       "column_name": "embedding",
       "dimensions": 3,
-      "metric": "cosine"
+      "metric": "cosine",
+      "name": null
     },
     "CountRequest": {
       "collection": "pgcontext_fixture",
@@ -953,7 +966,8 @@
         0.3
       ],
       "filter": null,
-      "limit": 10
+      "limit": 10,
+      "vector_name": null
     },
     "DiscoveryRequest": {
       "schema_names": [
@@ -995,7 +1009,8 @@
         "id": "00000000-0000-0000-0000-000000000001",
         "schema": "public",
         "table": "pgcontext_fixture_documents"
-      }
+      },
+      "vector_name": null
     },
     "GraphStart": {
       "id": "00000000-0000-0000-0000-000000000001",
@@ -1011,7 +1026,8 @@
       ],
       "group_by": "tenant_id",
       "group_limit": 1,
-      "limit": 10
+      "limit": 10,
+      "vector_name": null
     },
     "JointSearchRequest": {
       "collection": "pgcontext_fixture",
@@ -1039,6 +1055,7 @@
         }
       ],
       "traversal_limit": 500,
+      "vector_name": null,
       "weights": {
         "graph": 0.4,
         "lexical": 0.2,
@@ -1081,6 +1098,7 @@
         "schema": "public",
         "table": "pgcontext_fixture_documents"
       },
+      "vector_name": null,
       "weights": {
         "context": 0.7,
         "graph": 0.3
@@ -1099,7 +1117,8 @@
       ],
       "filter": null,
       "limit": 10,
-      "minimum_recall": 0.95
+      "minimum_recall": 0.95,
+      "vector_name": null
     },
     "TextHybridSearchRequest": {
       "collection": "pgcontext_fixture",
@@ -1109,7 +1128,8 @@
         0.3
       ],
       "limit": 10,
-      "query": "synthetic context"
+      "query": "synthetic context",
+      "vector_name": null
     },
     "VectorFirstSearchRequest": {
       "collection": "pgcontext_fixture",
@@ -1124,7 +1144,8 @@
       "graph_limit": 200,
       "limit": 10,
       "max_depth": 2,
-      "relationship_types": []
+      "relationship_types": [],
+      "vector_name": null
     }
   },
   "responses": {
@@ -1200,12 +1221,9 @@
     "CollectionGetResponse": {
       "collection": {
         "created_at": "2026-07-29T00:00:00Z",
-        "dimensions": 0,
+        "default_vector_name": "synthetic",
         "filter_columns": [],
         "id": "00000000-0000-0000-0000-000000000001",
-        "index_kind": "none",
-        "index_name": "synthetic",
-        "index_status": "missing",
         "is_default": false,
         "jsonb_filter_paths": [],
         "last_error_code": "synthetic",
@@ -1213,11 +1231,8 @@
         "last_reconciled_at": "2026-07-29T00:00:00Z",
         "mapped_point_count": 0,
         "max_search_limit": 0,
-        "metric": "cosine",
         "name": "synthetic",
-        "owns_index": false,
         "owns_source_table": false,
-        "owns_vector_column": false,
         "point_reconciliation_status": "pending",
         "project_id": "synthetic",
         "result_columns": [],
@@ -1229,15 +1244,13 @@
         "table_name": "synthetic",
         "text_column": "synthetic",
         "updated_at": "2026-07-29T00:00:00Z",
-        "vector_column": "synthetic",
-        "vector_name": "synthetic",
-        "vector_type_owner": "pgcontext"
+        "vectors": []
       },
       "deletion_plan": {
-        "drop_owned_index": "synthetic",
+        "drop_owned_indexes": [],
         "pgcontext_collection": "synthetic",
         "preserve_indexes": [],
-        "preserve_source_column": "synthetic",
+        "preserve_source_columns": [],
         "preserve_source_table": "synthetic"
       },
       "request_id": "synthetic"
@@ -1272,7 +1285,6 @@
       },
       "collection_id": "00000000-0000-0000-0000-000000000001",
       "collection_name": "synthetic",
-      "index_status": "missing",
       "last_error_code": "synthetic",
       "last_error_stage": "synthetic",
       "last_reconciled_at": "2026-07-29T00:00:00Z",
@@ -1281,16 +1293,14 @@
       "request_id": "synthetic",
       "serving_status": "available",
       "status": "ready",
-      "updated_at": "2026-07-29T00:00:00Z"
+      "updated_at": "2026-07-29T00:00:00Z",
+      "vectors": []
     },
     "ContextCollection": {
       "created_at": "2026-07-29T00:00:00Z",
-      "dimensions": 0,
+      "default_vector_name": "synthetic",
       "filter_columns": [],
       "id": "00000000-0000-0000-0000-000000000001",
-      "index_kind": "none",
-      "index_name": "synthetic",
-      "index_status": "missing",
       "is_default": false,
       "jsonb_filter_paths": [],
       "last_error_code": "synthetic",
@@ -1298,11 +1308,8 @@
       "last_reconciled_at": "2026-07-29T00:00:00Z",
       "mapped_point_count": 0,
       "max_search_limit": 0,
-      "metric": "cosine",
       "name": "synthetic",
-      "owns_index": false,
       "owns_source_table": false,
-      "owns_vector_column": false,
       "point_reconciliation_status": "pending",
       "project_id": "synthetic",
       "result_columns": [],
@@ -1314,9 +1321,7 @@
       "table_name": "synthetic",
       "text_column": "synthetic",
       "updated_at": "2026-07-29T00:00:00Z",
-      "vector_column": "synthetic",
-      "vector_name": "synthetic",
-      "vector_type_owner": "pgcontext"
+      "vectors": []
     },
     "ContextJointResponse": {
       "collection": {

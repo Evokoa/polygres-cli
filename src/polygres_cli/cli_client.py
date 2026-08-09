@@ -57,6 +57,8 @@ class CliControlPlaneClient:
         trace: Callable[[str], None] | None = None,
         timeout: float = 30.0,
         max_retries: int = 2,
+        command_id: str | None = None,
+        command_name: str | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._access_token = access_token
@@ -68,6 +70,8 @@ class CliControlPlaneClient:
         self._trace = trace
         self._timeout = timeout
         self._max_retries = max_retries
+        self._command_id = command_id
+        self._command_name = command_name
         self._client = httpx.Client(timeout=timeout)
         self._direct_runtime_graph = _enabled("CLI_DIRECT_RUNTIME_GRAPH_ENABLED")
         self._runtime = RuntimeClient(
@@ -75,6 +79,15 @@ class CliControlPlaneClient:
             http_client=self._client,
             max_retries=max_retries,
             allow_local_http=urlsplit(self._base_url).hostname in {"localhost", "127.0.0.1", "::1"},
+            telemetry_headers={
+                key: value
+                for key, value in {
+                    "X-Polygres-Command-ID": command_id,
+                    "X-Polygres-Command-Name": command_name,
+                    "User-Agent": f"polygres-cli/{__version__}",
+                }.items()
+                if value is not None
+            },
         )
 
     def close(self) -> None:
@@ -374,15 +387,6 @@ class CliControlPlaneClient:
 
     def list_vector_configurations(self, project_id: str) -> dict[str, Any]:
         return self._get(f"/projects/{project_id}/vector/configurations")
-
-    def create_vector_configuration(
-        self, project_id: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
-        return self._post(
-            f"/projects/{project_id}/vector/configurations",
-            payload,
-            timeout=HEAVY_REQUEST_TIMEOUT,
-        )
 
     def delete_vector_configuration(self, project_id: str, config_id: str) -> dict[str, Any]:
         return self._delete(f"/projects/{project_id}/vector/configurations/{config_id}")
@@ -839,6 +843,10 @@ class CliControlPlaneClient:
         if auth and not self._access_token:
             raise CliError("AUTH_REQUIRED", "Run `polygres login` to continue.", exit_code=3)
         headers = {"User-Agent": f"polygres-cli/{__version__}"}
+        if self._command_id:
+            headers["X-Polygres-Command-ID"] = self._command_id
+        if self._command_name:
+            headers["X-Polygres-Command-Name"] = self._command_name
         if auth and self._access_token:
             headers["Authorization"] = f"Bearer {self._access_token}"
         if idempotency_key is not None:

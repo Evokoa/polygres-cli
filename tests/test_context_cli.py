@@ -324,15 +324,15 @@ def test_context_init_reuses_one_eligible_pgvector_column(
         "evaluated_at": "2026-08-06T00:00:00Z",
         "updated_at": "2026-08-06T00:00:00Z",
     }
-    evaluate = respx.post(
-        f"{API_BASE_URL}/projects/{PROJECT_ID}/context/onboarding/evaluate"
-    ).mock(return_value=httpx.Response(200, json=onboarding))
+    evaluate = respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/context/onboarding/evaluate").mock(
+        return_value=httpx.Response(200, json=onboarding)
+    )
     acknowledge = respx.post(
         f"{API_BASE_URL}/projects/{PROJECT_ID}/context/onboarding/acknowledge"
     ).mock(return_value=httpx.Response(200, json={**onboarding, "offer_acknowledged": True}))
-    create = respx.post(
-        f"{API_BASE_URL}/projects/{PROJECT_ID}/context/collections"
-    ).mock(return_value=httpx.Response(202, json=response()))
+    create = respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/context/collections").mock(
+        return_value=httpx.Response(202, json=response())
+    )
 
     rc, out, err = run_cli(
         context_args("init", "--yes", "--no-wait"),
@@ -356,6 +356,7 @@ def test_context_init_reuses_one_eligible_pgvector_column(
             "metadata_column": None,
         },
         "vector": {
+            "name": None,
             "column_name": "embedding",
             "dimensions": 1536,
             "metric": "cosine",
@@ -518,6 +519,7 @@ def test_create_serializes_defaults_and_idempotency_without_waiting(
         "metadata_column": "metadata",
     }
     assert body["vector"] == {
+        "name": None,
         "column_name": "embedding",
         "dimensions": 768,
         "metric": "cosine",
@@ -932,6 +934,7 @@ def test_joint_uses_strict_context_route_and_preserves_json_response(
     body = json.loads(request.content)
     assert body == {
         "collection": "docs",
+        "vector_name": None,
         "embedding": [0.1, 0.2],
         "query": "current guidance",
         "starts": [{"schema": "public", "table": "accounts", "id": "acct_1"}],
@@ -971,6 +974,7 @@ def test_joint_direct_flags_serialize_shared_defaults(
     assert err == ""
     assert json.loads(route.calls[0].request.content) == {
         "collection": "docs",
+        "vector_name": None,
         "embedding": [0.1],
         "query": None,
         "starts": [],

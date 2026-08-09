@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from uuid import uuid4
 
 from polygres_cli._vendor.polygres_lib.context import (
     CollectionCreateRequest,
@@ -157,7 +158,9 @@ def main(argv: list[str] | None = None) -> int:
         if not hasattr(args, "func"):
             parser.print_help()
             return SUCCESS
-        ctx = _context(args)
+        command_id = str(uuid4())
+        command_name = _command_name(args)
+        ctx = _context(args, command_id=command_id, command_name=command_name)
         with ctx.client:
             result = int(args.func(ctx, args))
         if result == SUCCESS and args.resource != "notices":
@@ -199,7 +202,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 class Context:
-    def __init__(self, args: argparse.Namespace) -> None:
+    def __init__(
+        self,
+        args: argparse.Namespace,
+        *,
+        command_id: str | None = None,
+        command_name: str | None = None,
+    ) -> None:
         self.args = args
         self.store = ConfigStore()
         self.config = self.store.load()
@@ -212,6 +221,8 @@ class Context:
             on_refresh_auth_failure=self.clear_stored_auth,
             verbose=bool(args.verbose),
             trace=lambda line: sys.stderr.write(line + "\n"),
+            command_id=command_id,
+            command_name=command_name,
         )
 
     @property
@@ -239,8 +250,35 @@ class Context:
         self.save()
 
 
-def _context(args: argparse.Namespace) -> Context:
-    return Context(args)
+def _context(
+    args: argparse.Namespace,
+    *,
+    command_id: str | None = None,
+    command_name: str | None = None,
+) -> Context:
+    return Context(args, command_id=command_id, command_name=command_name)
+
+
+def _command_name(args: argparse.Namespace) -> str:
+    parts: list[str] = []
+    for name in (
+        "resource",
+        "action",
+        "kind",
+        "api_action",
+        "context_action",
+        "sources_action",
+        "collections_action",
+        "filters_action",
+        "points_action",
+        "operations_action",
+        "configs_action",
+        "config_action",
+    ):
+        value = getattr(args, name, None)
+        if isinstance(value, str) and value:
+            parts.append(value.replace("_", "-"))
+    return ".".join(parts)[:80] or "unknown"
 
 
 def _add_auth_parsers(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -360,15 +398,18 @@ def _add_vector_parsers(subparsers: argparse._SubParsersAction[argparse.Argument
     configs_sub = configs.add_subparsers(dest="configs_action", required=True)
     list_parser = configs_sub.add_parser("list", help="list vector configurations")
     list_parser.set_defaults(func=handle_vector_configs_list)
-    create = configs_sub.add_parser("create", help="create vector configuration")
-    create.add_argument("name")
-    create.add_argument("--table", required=True)
-    create.add_argument("--embedding-column", required=True)
-    create.add_argument("--dimensions", type=_dimensions, required=True)
+    create = configs_sub.add_parser(
+        "create",
+        help="retired; create a pgContext collection instead",
+    )
+    create.add_argument("name", nargs="?")
+    create.add_argument("--table")
+    create.add_argument("--embedding-column")
+    create.add_argument("--dimensions")
     create.add_argument("--schema", default="public")
     create.add_argument("--row-id-column", default="id")
-    create.add_argument("--metric", choices=["cosine", "inner_product", "l2"], default="cosine")
-    create.add_argument("--index-kind", choices=["hnsw", "none"], default="hnsw")
+    create.add_argument("--metric")
+    create.add_argument("--index-kind")
     create.add_argument("--metadata-column", action="append", default=[])
     create.add_argument("--filter-column", action="append", default=[])
     create.set_defaults(func=handle_vector_configs_create)
@@ -1021,7 +1062,10 @@ def handle_db_psql(ctx: Context, args: argparse.Namespace) -> int:
         "--dbname",
         str(database["database"]),
     ]
-    env = {"PGSSLMODE": "require"}
+    # Public package boundary: this value is contract-tested against the API's
+    # CUSTOMER_CLI registry entry without importing server code into the CLI.
+    application_name = "polygres-cli"
+    env = {"PGAPPNAME": application_name, "PGSSLMODE": "require"}
     if shutil.which("psql") is None:
         if ctx.json:
             write_json(
@@ -1035,7 +1079,9 @@ def handle_db_psql(ctx: Context, args: argparse.Namespace) -> int:
         elif not ctx.quiet:
             sys.stdout.write("psql is not installed or not on PATH.\n\n")
             sys.stdout.write("Run after installing psql:\n")
-            sys.stdout.write("PGSSLMODE=require " + " ".join(command) + "\n")
+            sys.stdout.write(
+                f"PGAPPNAME={application_name} PGSSLMODE=require " + " ".join(command) + "\n"
+            )
         return LOCAL_DEPENDENCY
     if ctx.json:
         write_json(
@@ -1244,23 +1290,17 @@ def handle_vector_configs_list(ctx: Context, args: argparse.Namespace) -> int:
 
 
 def handle_vector_configs_create(ctx: Context, args: argparse.Namespace) -> int:
-    _validate_identifiers(args.schema, args.table, args.row_id_column, args.embedding_column)
-    _validate_identifiers(*args.metadata_column, *args.filter_column)
-    payload = {
-        "name": args.name,
-        "schema_name": args.schema,
-        "table_name": args.table,
-        "row_id_column": args.row_id_column,
-        "embedding_column": args.embedding_column,
-        "dimensions": args.dimensions,
-        "metric": args.metric,
-        "metadata_columns": args.metadata_column,
-        "filter_columns": args.filter_column,
-        "index_kind": args.index_kind,
-    }
-    project_id = _resolve_project_id(ctx, None)
-    response = ctx.client.create_vector_configuration(project_id, payload)
-    return _emit_config_response(ctx, response)
+    raise CliError(
+        "VECTOR_CREATION_RETIRED",
+        "New pgvector column registrations are no longer supported. Create a pgContext "
+        "collection with a pgcontext.vector column using "
+        "`polygres context collections create` instead.",
+        exit_code=USAGE,
+        details={
+            "replacement": "pgcontext_collection",
+            "command": "polygres context collections create",
+        },
+    )
 
 
 def handle_vector_configs_delete(ctx: Context, args: argparse.Namespace) -> int:

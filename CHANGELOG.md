@@ -2,7 +2,14 @@
 
 All notable changes to `polygres-cli` are documented in this file.
 
-## 0.2.0 - 2026-08-06
+## Unreleased
+
+### Changed
+
+- `polygres vector configs create` now returns a migration error directing users to
+  `polygres context collections create`.
+
+## 0.2.0 - 2026-08-08
 
 ### Added
 
