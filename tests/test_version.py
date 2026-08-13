@@ -54,10 +54,10 @@ def test_release_documentation_names_current_cli_version() -> None:
     readme = (root / "README.md").read_text(encoding="utf-8")
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    assert "Package version: [`0.2.1`]" in readme
-    assert "python-cli-v0.2.1" in readme
-    assert "CLI 0.2.1 release notes" in readme
-    assert "## 0.2.1 - 2026-08-09" in changelog
+    assert "Package version: [`0.2.2`]" in readme
+    assert "python-cli-v0.2.2" in readme
+    assert "CLI 0.2.2 release notes" in readme
+    assert "## 0.2.2 - 2026-08-12" in changelog
 
 
 @pytest.mark.parametrize(
@@ -78,4 +78,4 @@ def test_release_tag_requires_exact_semver_shape(tag: str) -> None:
 
 def test_release_tag_must_match_distribution() -> None:
     with pytest.raises(ValueError, match="do not match"):
-        VERIFIER.verified_versions("python-cli-v0.2.2")
+        VERIFIER.verified_versions("python-cli-v0.2.1")

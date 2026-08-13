@@ -3386,6 +3386,37 @@
         "title": "EntityRef",
         "type": "object"
       },
+      "ExistingTextTsvectorSetupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "mode": {
+            "const": "existing",
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "column"
+        ],
+        "title": "ExistingTextTsvectorSetupRequest",
+        "type": "object"
+      },
       "FacetValue": {
         "additionalProperties": true,
         "properties": {
@@ -3624,6 +3655,46 @@
           "graph_weight"
         ],
         "title": "FusionMetadata",
+        "type": "object"
+      },
+      "GeneratedTextTsvectorSetupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "generated_column": {
+            "title": "Generated Column",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "mode": {
+            "const": "generate",
+            "title": "Mode",
+            "type": "string"
+          },
+          "source_columns": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Source Columns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "mode",
+          "source_columns",
+          "generated_column"
+        ],
+        "title": "GeneratedTextTsvectorSetupRequest",
         "type": "object"
       },
       "GraphBuildRequest": {
@@ -6059,6 +6130,62 @@
         "title": "RuntimeCapabilities",
         "type": "object"
       },
+      "SdkNoticeResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "recommended_version": {
+            "title": "Recommended Version",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "id",
+          "recommended_version",
+          "severity",
+          "url"
+        ],
+        "title": "SdkNoticeResponse",
+        "type": "object"
+      },
+      "SdkNoticesResponse": {
+        "properties": {
+          "notices": {
+            "items": {
+              "$ref": "#/components/schemas/SdkNoticeResponse"
+            },
+            "title": "Notices",
+            "type": "array"
+          }
+        },
+        "required": [
+          "notices"
+        ],
+        "title": "SdkNoticesResponse",
+        "type": "object"
+      },
       "SelectOrganizationInvitationRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6134,6 +6261,13 @@
       "TextConfigurationCreateRequest": {
         "additionalProperties": false,
         "properties": {
+          "default_limit": {
+            "default": 10,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Default Limit",
+            "type": "integer"
+          },
           "filter_columns": {
             "items": {
               "type": "string"
@@ -6145,6 +6279,13 @@
             "default": "english",
             "title": "Language",
             "type": "string"
+          },
+          "max_limit": {
+            "default": 100,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Limit",
+            "type": "integer"
           },
           "metadata_columns": {
             "items": {
@@ -6212,6 +6353,31 @@
             ],
             "title": "Text Column"
           },
+          "tsvector": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "existing": "#/components/schemas/ExistingTextTsvectorSetupRequest",
+                    "generate": "#/components/schemas/GeneratedTextTsvectorSetupRequest"
+                  },
+                  "propertyName": "mode"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ExistingTextTsvectorSetupRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GeneratedTextTsvectorSetupRequest"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tsvector"
+          },
           "tsvector_column": {
             "anyOf": [
               {
@@ -6221,6 +6387,8 @@
                 "type": "null"
               }
             ],
+            "deprecated": true,
+            "description": "Legacy existing-column input. Prefer tsvector.mode=existing.",
             "title": "Tsvector Column"
           }
         },
@@ -6456,11 +6624,17 @@
             "type": "object"
           },
           "limit": {
-            "default": 10,
-            "maximum": 1000.0,
-            "minimum": 1.0,
-            "title": "Limit",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
           },
           "query": {
             "maxLength": 2000,
@@ -13737,6 +13911,106 @@
         "summary": "Update Text Configuration"
       }
     },
+    "/v1/projects/{project_id}/text/configurations/{config_id}/diagnostics": {
+      "get": {
+        "operationId": "text_configuration_diagnostics_v1_projects__project_id__text_configurations__config_id__diagnostics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Text Configuration Diagnostics V1 Projects  Project Id  Text Configurations  Config Id  Diagnostics Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Text Configuration Diagnostics"
+      }
+    },
+    "/v1/projects/{project_id}/text/configurations/{config_id}/reindex": {
+      "post": {
+        "operationId": "reindex_text_configuration_v1_projects__project_id__text_configurations__config_id__reindex_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reindex Text Configuration V1 Projects  Project Id  Text Configurations  Config Id  Reindex Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reindex Text Configuration"
+      }
+    },
     "/v1/projects/{project_id}/text/fuzzy": {
       "post": {
         "operationId": "text_fuzzy_search_v1_projects__project_id__text_fuzzy_post",
@@ -14417,6 +14691,76 @@
           }
         },
         "summary": "Create Roadmap Suggestion"
+      }
+    },
+    "/v1/sdk/notices": {
+      "get": {
+        "operationId": "sdk_notices_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "pattern": "^(?:v)?\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9_-]{1,32}$",
+              "title": "Channel",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-none-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-None-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SdkNoticesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "304": {
+            "description": "The cached notice representation is current."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sdk Notices"
       }
     },
     "/v1/tiers": {

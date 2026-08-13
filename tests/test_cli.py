@@ -1177,7 +1177,7 @@ def test_keys_revoke_requires_confirmation_without_request(
             "body",
         ],
         ["--json", "text", "configs", "delete", CONFIG_ID],
-        ["--json", "text", "configs", "delete", "not-a-uuid", "--yes"],
+        ["--json", "text", "configs", "delete", "bad/name", "--yes"],
         ["--json", "import", "status", "not-a-uuid"],
     ],
 )
@@ -1637,8 +1637,18 @@ def test_vector_create_directs_users_to_pgcontext_without_calling_api(
     assert payload["error"]["details"] == {
         "replacement": "pgcontext_collection",
         "command": "polygres context collections create",
+        "upgrade_command": "pipx upgrade polygres-cli",
+        "documentation_url": (
+            "https://docs.evokoa.com/polygres/cli/context#collection-lifecycle"
+        ),
     }
-    assert "pgcontext.vector" in payload["error"]["message"]
+    assert "pipx upgrade polygres-cli" in payload["error"]["message"]
+    assert "`polygres context collections create`" in payload["error"]["message"]
+    assert "<name>" not in payload["error"]["message"]
+    assert (
+        "https://docs.evokoa.com/polygres/cli/context#collection-lifecycle"
+        in payload["error"]["message"]
+    )
     assert len(respx.calls) == 0
 
     rc, out, err = run_cli(
@@ -1650,7 +1660,9 @@ def test_vector_create_directs_users_to_pgcontext_without_calling_api(
     assert rc == 2
     assert out == ""
     assert "New pgvector column registrations are no longer supported" in err
+    assert "pipx upgrade polygres-cli" in err
     assert "polygres context collections create" in err
+    assert "https://docs.evokoa.com/polygres/cli/context#collection-lifecycle" in err
     assert len(respx.calls) == 0
 
     rc, out, _ = run_cli(
@@ -1792,33 +1804,12 @@ def test_vector_reindex_verification_failure_exits_nonzero(
 
 
 @ROUTE_CTX
-def test_text_generated_tsvector_applies_migration_then_creates_config(
+def test_text_generated_tsvector_uses_configuration_endpoint(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
-    migration_route = _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/migrations"),
-        return_value=httpx.Response(
-            200,
-            json={
-                "request_id": "req_migration",
-                "migration": {"id": CONFIG_ID, "name": "m_docs_body_tsv_generated_tsvector"},
-            },
-        ),
-    )
-    _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/migrations/{CONFIG_ID}/apply"),
-        return_value=httpx.Response(
-            200,
-            json={
-                "request_id": "req_apply",
-                "migration": {"id": CONFIG_ID, "name": "m_docs_body_tsv_generated_tsvector"},
-                "operation": {"applied": True},
-            },
-        ),
-    )
     config_route = _stub(
         respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/text/configurations"),
         return_value=httpx.Response(
@@ -1831,7 +1822,10 @@ def test_text_generated_tsvector_applies_migration_then_creates_config(
                     "search_kind": "tsvector",
                     "tsvector_column": "body_tsv",
                 },
-                "operation": {"created": True},
+                "operation": {
+                    "generated_column_created": True,
+                    "generated_column": "body_tsv",
+                },
             },
         ),
     )
@@ -1858,10 +1852,6 @@ def test_text_generated_tsvector_applies_migration_then_creates_config(
 
     assert rc == 0
     assert err == ""
-    migration_payload = json.loads(migration_route.calls[0].request.content)
-    assert migration_payload["name"] == "m_docs_body_tsv_generated_tsvector"
-    expected_sql = 'ALTER TABLE "public"."documents" ADD COLUMN IF NOT EXISTS "body_tsv"'
-    assert expected_sql in migration_payload["sql_body"]
     assert json.loads(config_route.calls[0].request.content) == {
         "name": "docs",
         "search_kind": "tsvector",
@@ -1869,13 +1859,19 @@ def test_text_generated_tsvector_applies_migration_then_creates_config(
         "table_name": "documents",
         "row_id_column": "id",
         "row_id_columns": ["id"],
-        "tsvector_column": "body_tsv",
         "language": "english",
+        "default_limit": 10,
+        "max_limit": 100,
         "metadata_columns": [],
         "filter_columns": [],
+        "tsvector": {
+            "mode": "generate",
+            "source_columns": ["body"],
+            "generated_column": "body_tsv",
+            "language": "english",
+        },
     }
     payload = json.loads(out)
-    assert payload["migration"]["id"] == CONFIG_ID
     assert payload["operation"]["generated_column_created"] is True
 
 
@@ -2913,30 +2909,24 @@ def test_migration_terminal_failure_exits_one_and_never_claims_applied(
 
 
 @ROUTE_CTX
-def test_generated_tsvector_stops_when_migration_fails(
+def test_generated_tsvector_reports_configuration_endpoint_failure(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
-    _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/migrations"),
+    text_route = _stub(
+        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/text/configurations"),
         return_value=httpx.Response(
-            200,
-            json={"migration": {"id": CONFIG_ID, "name": "generated", "status": "draft"}},
-        ),
-    )
-    _stub(
-        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/migrations/{CONFIG_ID}/apply"),
-        return_value=httpx.Response(
-            200,
+            400,
             json={
-                "request_id": "req_failed",
-                "migration": {"id": CONFIG_ID, "status": "failed", "error_message": "bad SQL"},
+                "error": {
+                    "code": "TEXT_INDEX_FAILED",
+                    "message": "TSVector setup failed.",
+                }
             },
         ),
     )
-    text_route = respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/text/configurations")
 
     rc, out, err = run_cli(
         [
@@ -2958,10 +2948,115 @@ def test_generated_tsvector_stops_when_migration_fails(
         tmp_path,
     )
 
-    assert rc == 1
+    assert rc == 2
     assert err == ""
-    assert json.loads(out)["error"]["code"] == "MIGRATION_APPLY_FAILED"
-    assert not text_route.called
+    assert json.loads(out)["error"]["code"] == "TEXT_INDEX_FAILED"
+    assert text_route.called
+
+
+@ROUTE_CTX
+def test_text_configuration_management_commands_support_names(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    base = f"{API_BASE_URL}/projects/{PROJECT_ID}/text/configurations/Docs%20Search"
+    configuration = {
+        "id": CONFIG_ID,
+        "name": "Docs Search",
+        "search_kind": "fuzzy",
+        "index_status": "ready",
+    }
+    get_route = _stub(
+        respx.get(base),
+        return_value=httpx.Response(200, json={"configuration": configuration}),
+    )
+    update_route = _stub(
+        respx.patch(base),
+        return_value=httpx.Response(200, json={"configuration": configuration}),
+    )
+    diagnostics_route = _stub(
+        respx.get(f"{base}/diagnostics"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "configuration": configuration,
+                "diagnostics": {"healthy": True, "index_found": True, "index_valid": True},
+            },
+        ),
+    )
+    reindex_route = _stub(
+        respx.post(f"{base}/reindex"),
+        return_value=httpx.Response(200, json={"configuration": configuration}),
+    )
+
+    commands = [
+        ["--json", "text", "configs", "get", "Docs Search"],
+        [
+            "--json",
+            "text",
+            "configs",
+            "update",
+            "Docs Search",
+            "--default-limit",
+            "20",
+        ],
+        ["--json", "text", "configs", "diagnostics", "Docs Search"],
+        ["--json", "text", "configs", "reindex", "Docs Search"],
+    ]
+    for command in commands:
+        rc, _, err = run_cli(command, capsys, monkeypatch, tmp_path)
+        assert rc == 0
+        assert err == ""
+
+    assert get_route.called
+    assert json.loads(update_route.calls[0].request.content) == {"default_limit": 20}
+    assert diagnostics_route.called
+    assert reindex_route.called
+
+
+@ROUTE_CTX
+def test_text_create_fuzzy_supports_compound_row_ids(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    route = _stub(
+        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/text/configurations"),
+        return_value=httpx.Response(
+            200,
+            json={"configuration": {"id": CONFIG_ID, "name": "memberships"}},
+        ),
+    )
+
+    rc, _, err = run_cli(
+        [
+            "--json",
+            "text",
+            "configs",
+            "create-fuzzy",
+            "memberships",
+            "--table",
+            "memberships",
+            "--text-column",
+            "label",
+            "--row-id-column",
+            "account_id",
+            "--row-id-column",
+            "user_id",
+        ],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 0
+    assert err == ""
+    payload = json.loads(route.calls[0].request.content)
+    assert payload["row_id_column"] == "account_id"
+    assert payload["row_id_columns"] == ["account_id", "user_id"]
 
 
 @ROUTE_CTX

@@ -432,6 +432,9 @@ def _add_text_parsers(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     configs_sub = configs.add_subparsers(dest="configs_action", required=True)
     list_parser = configs_sub.add_parser("list", help="list text configurations")
     list_parser.set_defaults(func=handle_text_configs_list)
+    get = configs_sub.add_parser("get", help="show a text configuration")
+    get.add_argument("config_id")
+    get.set_defaults(func=handle_text_configs_get)
     tsv = configs_sub.add_parser("create-tsvector", help="create TSVector configuration")
     tsv.add_argument("name")
     tsv.add_argument("--table", required=True)
@@ -439,8 +442,10 @@ def _add_text_parsers(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     tsv.add_argument("--text-column")
     tsv.add_argument("--generated-column")
     tsv.add_argument("--schema", default="public")
-    tsv.add_argument("--row-id-column", default="id")
+    tsv.add_argument("--row-id-column", action="append")
     tsv.add_argument("--language", default="english")
+    tsv.add_argument("--default-limit", type=_text_limit, default=10)
+    tsv.add_argument("--max-limit", type=_text_limit, default=100)
     tsv.add_argument("--metadata-column", action="append", default=[])
     tsv.add_argument("--filter-column", action="append", default=[])
     tsv.add_argument("--yes", action="store_true")
@@ -450,12 +455,34 @@ def _add_text_parsers(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     fuzzy.add_argument("--table", required=True)
     fuzzy.add_argument("--text-column", required=True)
     fuzzy.add_argument("--schema", default="public")
-    fuzzy.add_argument("--row-id-column", default="id")
+    fuzzy.add_argument("--row-id-column", action="append")
     fuzzy.add_argument("--language", default="english")
     fuzzy.add_argument("--similarity-threshold", type=_similarity_threshold, default=0.3)
+    fuzzy.add_argument("--default-limit", type=_text_limit, default=10)
+    fuzzy.add_argument("--max-limit", type=_text_limit, default=100)
     fuzzy.add_argument("--metadata-column", action="append", default=[])
     fuzzy.add_argument("--filter-column", action="append", default=[])
     fuzzy.set_defaults(func=handle_text_create_fuzzy)
+    update = configs_sub.add_parser("update", help="update a text configuration")
+    update.add_argument("config_id")
+    update.add_argument("--table")
+    update.add_argument("--schema")
+    update.add_argument("--row-id-column", action="append")
+    update.add_argument("--text-column")
+    update.add_argument("--tsvector-column")
+    update.add_argument("--language")
+    update.add_argument("--similarity-threshold", type=_similarity_threshold)
+    update.add_argument("--default-limit", type=_text_limit)
+    update.add_argument("--max-limit", type=_text_limit)
+    update.add_argument("--metadata-column", action="append")
+    update.add_argument("--filter-column", action="append")
+    update.set_defaults(func=handle_text_configs_update)
+    diagnostics = configs_sub.add_parser("diagnostics", help="inspect text index health")
+    diagnostics.add_argument("config_id")
+    diagnostics.set_defaults(func=handle_text_configs_diagnostics)
+    reindex = configs_sub.add_parser("reindex", help="rebuild a text index")
+    reindex.add_argument("config_id")
+    reindex.set_defaults(func=handle_text_configs_reindex)
     delete = configs_sub.add_parser("delete", help="delete text configuration")
     delete.add_argument("config_id")
     delete.add_argument("--yes", action="store_true")
@@ -1292,13 +1319,19 @@ def handle_vector_configs_list(ctx: Context, args: argparse.Namespace) -> int:
 def handle_vector_configs_create(ctx: Context, args: argparse.Namespace) -> int:
     raise CliError(
         "VECTOR_CREATION_RETIRED",
-        "New pgvector column registrations are no longer supported. Create a pgContext "
-        "collection with a pgcontext.vector column using "
-        "`polygres context collections create` instead.",
+        "New pgvector column registrations are no longer supported.\n"
+        "Update your CLI version with `pipx upgrade polygres-cli`, and create a collection "
+        "using `polygres context collections create`.\n"
+        "Refer to the documentation for more information: "
+        "https://docs.evokoa.com/polygres/cli/context#collection-lifecycle",
         exit_code=USAGE,
         details={
             "replacement": "pgcontext_collection",
             "command": "polygres context collections create",
+            "upgrade_command": "pipx upgrade polygres-cli",
+            "documentation_url": (
+                "https://docs.evokoa.com/polygres/cli/context#collection-lifecycle"
+            ),
         },
     )
 
@@ -1339,7 +1372,15 @@ def handle_text_configs_list(ctx: Context, args: argparse.Namespace) -> int:
     return SUCCESS
 
 
+def handle_text_configs_get(ctx: Context, args: argparse.Namespace) -> int:
+    _validate_text_config_ref(args.config_id)
+    project_id = _resolve_project_id(ctx, None)
+    return _emit_config_response(ctx, ctx.client.get_text_configuration(project_id, args.config_id))
+
+
 def handle_text_create_tsvector(ctx: Context, args: argparse.Namespace) -> int:
+    row_id_columns = args.row_id_column or ["id"]
+    _validate_text_limits(args.default_limit, args.max_limit)
     generated_mode = bool(args.text_column or args.generated_column)
     existing_mode = bool(args.tsvector_column)
     if existing_mode == generated_mode:
@@ -1348,13 +1389,16 @@ def handle_text_create_tsvector(ctx: Context, args: argparse.Namespace) -> int:
             "Provide exactly one of --tsvector-column or --text-column with --generated-column.",
             exit_code=USAGE,
         )
-    _validate_identifiers(args.schema, args.table, args.row_id_column, args.language)
+    _validate_identifiers(args.schema, args.table, *row_id_columns, args.language)
     _validate_identifiers(*args.metadata_column, *args.filter_column)
-    migration: dict[str, Any] | None = None
     if existing_mode:
         _validate_identifiers(args.tsvector_column)
-        tsvector_column = args.tsvector_column
         generated_column_created = False
+        tsvector_setup: dict[str, Any] = {
+            "mode": "existing",
+            "column": args.tsvector_column,
+            "language": args.language,
+        }
     else:
         if not args.text_column or not args.generated_column:
             raise CliError(
@@ -1364,57 +1408,29 @@ def handle_text_create_tsvector(ctx: Context, args: argparse.Namespace) -> int:
             )
         _require_confirmation(ctx, args.yes, "Create a generated tsvector column?")
         _validate_identifiers(args.text_column, args.generated_column)
-        tsvector_column = args.generated_column
-        migration_name = _migration_name(
-            f"m_{args.name}_{args.generated_column}_generated_tsvector"
-        )
-        sql_body = _generated_tsvector_sql(
-            args.schema, args.table, args.text_column, args.generated_column, args.language
-        )
-        project_id = _resolve_project_id(ctx, None)
-        created = ctx.client.migrations_create(project_id, migration_name, sql_body)
-        migration_id = _object(created, "migration").get("id")
-        _validate_response_uuid(migration_id, "migration")
-        applied = ctx.client.migrations_apply(project_id, migration_id)
-        migration = applied.get("migration") or created.get("migration")
-        if not isinstance(migration, dict) or migration.get("status") == "failed":
-            raise CliError(
-                "MIGRATION_APPLY_FAILED",
-                str(
-                    migration.get("error_message")
-                    if isinstance(migration, dict)
-                    else (
-                        "The API did not return the generated-column migration result. Run "
-                        "`polygres migrations list` to inspect the migration; contact support "
-                        "with the request ID if the result is still missing."
-                    )
-                ),
-                request_id=applied.get("request_id"),
-            )
         generated_column_created = True
-    if existing_mode:
-        project_id = _resolve_project_id(ctx, None)
+        tsvector_setup = {
+            "mode": "generate",
+            "source_columns": [args.text_column],
+            "generated_column": args.generated_column,
+            "language": args.language,
+        }
+    project_id = _resolve_project_id(ctx, None)
     payload = {
         "name": args.name,
         "search_kind": "tsvector",
         "schema_name": args.schema,
         "table_name": args.table,
-        "row_id_column": args.row_id_column,
-        "row_id_columns": [args.row_id_column],
-        "tsvector_column": tsvector_column,
+        "row_id_column": row_id_columns[0],
+        "row_id_columns": row_id_columns,
         "language": args.language,
+        "default_limit": args.default_limit,
+        "max_limit": args.max_limit,
         "metadata_columns": args.metadata_column,
         "filter_columns": args.filter_column,
     }
-    try:
-        response = ctx.client.create_text_configuration(project_id, payload)
-    except CliError as exc:
-        if migration is not None:
-            exc.message = (
-                f"{exc.message} The generated column migration was applied; "
-                "the generated column may already exist."
-            )
-        raise
+    payload["tsvector"] = tsvector_setup
+    response = ctx.client.create_text_configuration(project_id, payload)
     output = {
         "configuration": response.get("configuration", {}),
         "operation": {
@@ -1423,14 +1439,14 @@ def handle_text_create_tsvector(ctx: Context, args: argparse.Namespace) -> int:
         },
         "request_id": response.get("request_id"),
     }
-    if migration is not None:
-        output["migration"] = migration
     return _emit(ctx, output, [("Configuration", output["configuration"].get("id", ""))])
 
 
 def handle_text_create_fuzzy(ctx: Context, args: argparse.Namespace) -> int:
+    row_id_columns = args.row_id_column or ["id"]
+    _validate_text_limits(args.default_limit, args.max_limit)
     _validate_identifiers(
-        args.schema, args.table, args.row_id_column, args.text_column, args.language
+        args.schema, args.table, *row_id_columns, args.text_column, args.language
     )
     _validate_identifiers(*args.metadata_column, *args.filter_column)
     payload = {
@@ -1438,10 +1454,12 @@ def handle_text_create_fuzzy(ctx: Context, args: argparse.Namespace) -> int:
         "search_kind": "fuzzy",
         "schema_name": args.schema,
         "table_name": args.table,
-        "row_id_column": args.row_id_column,
-        "row_id_columns": [args.row_id_column],
+        "row_id_column": row_id_columns[0],
+        "row_id_columns": row_id_columns,
         "text_column": args.text_column,
         "language": args.language,
+        "default_limit": args.default_limit,
+        "max_limit": args.max_limit,
         "metadata_columns": args.metadata_column,
         "filter_columns": args.filter_column,
         "similarity_threshold": args.similarity_threshold,
@@ -1452,11 +1470,81 @@ def handle_text_create_fuzzy(ctx: Context, args: argparse.Namespace) -> int:
 
 
 def handle_text_configs_delete(ctx: Context, args: argparse.Namespace) -> int:
-    _validate_uuid(args.config_id, "configuration ID")
+    _validate_text_config_ref(args.config_id)
     _require_confirmation(ctx, args.yes, f"Delete text configuration {args.config_id}?")
     project_id = _resolve_project_id(ctx, None)
     response = ctx.client.delete_text_configuration(project_id, args.config_id)
     return _emit_config_response(ctx, response, default_operation={"deleted": True})
+
+
+def handle_text_configs_update(ctx: Context, args: argparse.Namespace) -> int:
+    _validate_text_config_ref(args.config_id)
+    if args.default_limit is not None and args.max_limit is not None:
+        _validate_text_limits(args.default_limit, args.max_limit)
+    identifiers = [
+        value
+        for value in (
+            args.schema,
+            args.table,
+            args.text_column,
+            args.tsvector_column,
+            args.language,
+            *(args.row_id_column or []),
+            *(args.metadata_column or []),
+            *(args.filter_column or []),
+        )
+        if value is not None
+    ]
+    _validate_identifiers(*identifiers)
+    payload = {
+        key: value
+        for key, value in {
+            "schema_name": args.schema,
+            "table_name": args.table,
+            "row_id_columns": args.row_id_column,
+            "text_column": args.text_column,
+            "tsvector_column": args.tsvector_column,
+            "language": args.language,
+            "similarity_threshold": args.similarity_threshold,
+            "default_limit": args.default_limit,
+            "max_limit": args.max_limit,
+            "metadata_columns": args.metadata_column,
+            "filter_columns": args.filter_column,
+        }.items()
+        if value is not None
+    }
+    if not payload:
+        raise CliError("VALIDATION_ERROR", "Provide at least one field to update.", exit_code=USAGE)
+    project_id = _resolve_project_id(ctx, None)
+    return _emit_config_response(
+        ctx, ctx.client.update_text_configuration(project_id, args.config_id, payload)
+    )
+
+
+def handle_text_configs_diagnostics(ctx: Context, args: argparse.Namespace) -> int:
+    _validate_text_config_ref(args.config_id)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.diagnose_text_configuration(project_id, args.config_id)
+    return _emit(
+        ctx,
+        payload,
+        [
+            ("Configuration", payload.get("configuration", {}).get("name", "")),
+            ("Healthy", payload.get("diagnostics", {}).get("healthy", False)),
+            ("Index found", payload.get("diagnostics", {}).get("index_found", False)),
+            ("Index valid", payload.get("diagnostics", {}).get("index_valid", False)),
+        ],
+    )
+
+
+def handle_text_configs_reindex(ctx: Context, args: argparse.Namespace) -> int:
+    _validate_text_config_ref(args.config_id)
+    project_id = _resolve_project_id(ctx, None)
+    return _emit_config_response(
+        ctx,
+        ctx.client.reindex_text_configuration(project_id, args.config_id),
+        default_operation={"reindexed": True},
+    )
 
 
 def handle_import_csv(ctx: Context, args: argparse.Namespace) -> int:
@@ -3299,6 +3387,29 @@ def _validate_uuid(value: str, label: str) -> None:
         raise CliError("VALIDATION_ERROR", f"Invalid {label}.", exit_code=USAGE)
 
 
+def _validate_text_config_ref(value: str) -> None:
+    if UUID_LIKE_RE.fullmatch(value) or (
+        value == value.strip()
+        and 0 < len(value) <= 80
+        and not any(character in value for character in ("/", "?", "#", "\x00"))
+    ):
+        return
+    raise CliError(
+        "VALIDATION_ERROR",
+        "Invalid text configuration ID or name.",
+        exit_code=USAGE,
+    )
+
+
+def _validate_text_limits(default_limit: int, max_limit: int) -> None:
+    if default_limit > max_limit:
+        raise CliError(
+            "VALIDATION_ERROR",
+            "Default limit cannot exceed max limit.",
+            exit_code=USAGE,
+        )
+
+
 def _validate_response_uuid(value: object, label: str) -> None:
     if not isinstance(value, str) or not UUID_LIKE_RE.fullmatch(value):
         raise CliError(
@@ -3316,16 +3427,6 @@ def _validate_identifiers(*values: str | None) -> None:
     for value in values:
         if value is not None and not SQL_IDENTIFIER_RE.match(value):
             raise CliError("VALIDATION_ERROR", f"Invalid SQL identifier: {value}", exit_code=USAGE)
-
-
-def _generated_tsvector_sql(
-    schema: str, table: str, source_column: str, generated_column: str, language: str
-) -> str:
-    return (
-        f'ALTER TABLE "{schema}"."{table}" ADD COLUMN IF NOT EXISTS "{generated_column}" '
-        "tsvector GENERATED ALWAYS AS "
-        f"(to_tsvector('{language}'::regconfig, coalesce(\"{source_column}\"::text, ''))) STORED;"
-    )
 
 
 def _migration_name(value: str) -> str:
@@ -3351,6 +3452,10 @@ def _timeout_seconds(value: str) -> int:
 
 def _context_admin_limit(value: str) -> int:
     return _context_bounded_integer(value, label="limit", minimum=1, maximum=100)
+
+
+def _text_limit(value: str) -> int:
+    return _context_bounded_integer(value, label="text limit", minimum=1, maximum=1000)
 
 
 def _context_ranked_limit(value: str) -> int:

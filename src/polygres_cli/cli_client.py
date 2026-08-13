@@ -414,8 +414,35 @@ class CliControlPlaneClient:
             timeout=HEAVY_REQUEST_TIMEOUT,
         )
 
+    def get_text_configuration(self, project_id: str, config_id: str) -> dict[str, Any]:
+        return self._get(
+            f"/projects/{project_id}/text/configurations/{quote(config_id, safe='')}"
+        )
+
+    def update_text_configuration(
+        self, project_id: str, config_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._patch(
+            f"/projects/{project_id}/text/configurations/{quote(config_id, safe='')}",
+            payload,
+        )
+
+    def diagnose_text_configuration(self, project_id: str, config_id: str) -> dict[str, Any]:
+        return self._get(
+            f"/projects/{project_id}/text/configurations/{quote(config_id, safe='')}/diagnostics"
+        )
+
+    def reindex_text_configuration(self, project_id: str, config_id: str) -> dict[str, Any]:
+        return self._post(
+            f"/projects/{project_id}/text/configurations/{quote(config_id, safe='')}/reindex",
+            {},
+            timeout=HEAVY_REQUEST_TIMEOUT,
+        )
+
     def delete_text_configuration(self, project_id: str, config_id: str) -> dict[str, Any]:
-        return self._delete(f"/projects/{project_id}/text/configurations/{config_id}")
+        return self._delete(
+            f"/projects/{project_id}/text/configurations/{quote(config_id, safe='')}"
+        )
 
     def retrieval_readiness(self, project_id: str) -> dict[str, Any]:
         return self._get(f"/projects/{project_id}/retrieval/readiness")

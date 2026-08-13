@@ -4,6 +4,21 @@ All notable changes to `polygres-cli` are documented in this file.
 
 ## Unreleased
 
+## 0.2.2 - 2026-08-12
+
+### Added
+
+- Added commands to inspect, update, diagnose, rebuild, and remove text-search
+  configurations.
+- Added one-step TSVector setup for creating a generated column, index, and
+  configuration from one or more source columns.
+
+### Changed
+
+- Text-search commands now support compound row keys, metadata and filter
+  columns, configured result limits, and both generated and existing TSVector
+  columns.
+
 ## 0.2.1 - 2026-08-09
 
 ### Added
