@@ -58,7 +58,9 @@ and request headers. Before syncing a release to the public CLI repository:
    `python -m twine check dist/*`.
 5. Validate the release through TestPyPI before creating the matching
    `python-cli-vX.Y.Z` production tag. The release workflow rejects a tag that
-   does not exactly match the package version.
+   does not exactly match the package version. After PyPI accepts the package,
+   the workflow creates the matching GitHub Release from the version's
+   changelog entry and attaches the wheel and source distribution.
 
 ## Scope
 

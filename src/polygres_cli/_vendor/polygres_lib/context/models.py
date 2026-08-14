@@ -511,6 +511,7 @@ class JointSearchRequest(GraphSearchBase):
 
 class ErrorBody(ContextResponse):
     code: str
+    variant: str | None = None
     message: str
     details: dict[str, Any]
 
@@ -749,6 +750,7 @@ class CollectionGetResponse(ContextResponse):
 
 class ContextOperationFailure(ContextResponse):
     code: str
+    variant: str | None = None
     message: str
     details: dict[str, Any]
     http_status: int
@@ -1080,9 +1082,7 @@ class ContextJointResult(ContextSearchResult):
             raise ValueError("graph-introduced results require null baseline fields")
         if self.introduced_by_graph and self.graph is None:
             raise ValueError("graph-introduced results require graph evidence")
-        if not self.introduced_by_graph and (
-            self.baseline_rank is None or self.rank_lift is None
-        ):
+        if not self.introduced_by_graph and (self.baseline_rank is None or self.rank_lift is None):
             raise ValueError("non-graph-introduced results require baseline fields")
         if not math.isclose(
             self.score,

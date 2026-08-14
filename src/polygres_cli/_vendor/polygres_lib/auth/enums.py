@@ -233,6 +233,7 @@ class RuntimeScope(str, Enum):
     HYBRID_READ = "hybrid:read"
     CONTEXT_READ = "context:read"
     CONTEXT_MANAGE = "context:manage"
+    ROWS_WRITE = "rows:write"
 
 
 class RuntimeClientKind(str, Enum):
@@ -366,6 +367,7 @@ class PolicyId(str, Enum):
     PROJECT_PERMISSION = "project_permission"
     PROJECT_API_KEY = "project_api_key"
     GATEWAY_RUNTIME = "gateway_runtime"
+    RUNTIME_ROW_WRITE = "runtime_row_write"
     CLI_FLOW = "cli_flow"
     RECOVERY_SESSION = "recovery_session"
     LEGACY_DEMO = "legacy_demo"

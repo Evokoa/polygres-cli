@@ -14,6 +14,7 @@ from urllib.parse import quote, urlencode, urlsplit
 
 import httpx
 
+from polygres_cli._vendor.polygres_lib.errors import ERROR_CATALOG
 from polygres_cli._version import __version__
 from polygres_cli.api_openapi import ApiRequestPlan
 from polygres_cli.cli_auth import (
@@ -384,6 +385,87 @@ class CliControlPlaneClient:
             f"/projects/{project_id}/runtime/access",
             {"scope": scope},
         )
+
+    def rows_validate(
+        self,
+        project_id: str,
+        schema: str,
+        table: str,
+        request: dict[str, Any],
+    ) -> dict[str, Any]:
+        path = f"/tables/{quote(schema, safe='')}/{quote(table, safe='')}/rows/validate"
+        return self._runtime.request(
+            project_id,
+            "rows:write",
+            "POST",
+            path,
+            json=request,
+            read_only_retry=True,
+        )
+
+    def rows_write(
+        self,
+        project_id: str,
+        schema: str,
+        table: str,
+        request: dict[str, Any],
+    ) -> dict[str, Any]:
+        path = f"/tables/{quote(schema, safe='')}/{quote(table, safe='')}/rows"
+        body = dict(request)
+        idempotency_key = body.pop("idempotency_key", None)
+        try:
+            return self._runtime.request(
+                project_id,
+                "rows:write",
+                "POST",
+                path,
+                json=body,
+                allow_auth_replay=False,
+                headers=(
+                    {"Idempotency-Key": idempotency_key}
+                    if isinstance(idempotency_key, str)
+                    else None
+                ),
+            )
+        except CliError as exc:
+            if (
+                exc.server_code_declared
+                and exc.code in ERROR_CATALOG
+                and exc.code != "ROW_WRITE_OUTCOME_AMBIGUOUS"
+            ):
+                raise
+            if exc.code != "ROW_WRITE_OUTCOME_AMBIGUOUS" and exc.status_code not in {
+                408,
+                429,
+                500,
+                502,
+                503,
+                504,
+            }:
+                raise
+            details = {}
+            if isinstance(idempotency_key, str):
+                details["idempotency_key"] = idempotency_key
+            raise CliError(
+                "ROW_WRITE_OUTCOME_AMBIGUOUS",
+                "The row write outcome is unknown. Do not automatically retry it.",
+                exit_code=UNAVAILABLE,
+                details=details,
+                request_id=exc.request_id,
+                status_code=exc.status_code,
+                server_code_declared=exc.server_code_declared,
+            ) from exc
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            details = {}
+            key = idempotency_key
+            if isinstance(key, str):
+                details["idempotency_key"] = key
+            raise CliError(
+                "ROW_WRITE_OUTCOME_AMBIGUOUS",
+                "The row write outcome is unknown. Do not automatically retry it.",
+                exit_code=UNAVAILABLE,
+                details=details,
+            ) from exc
 
     def list_vector_configurations(self, project_id: str) -> dict[str, Any]:
         return self._get(f"/projects/{project_id}/vector/configurations")

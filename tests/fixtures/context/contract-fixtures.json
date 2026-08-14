@@ -355,7 +355,7 @@
       "error": {
         "code": "CONTEXT_SOURCE_TABLE_UNSUPPORTED",
         "details": {},
-        "message": "Source table unsupported."
+        "message": "The source table does not match the selected source mode. Check whether the table should already exist."
       },
       "request_id": "req_synthetic"
     },
@@ -363,7 +363,7 @@
       "error": {
         "code": "CONTEXT_SOURCE_KEY_REQUIRED",
         "details": {},
-        "message": "Source key required."
+        "message": "The source key must be NOT NULL and uniquely constrained."
       },
       "request_id": "req_synthetic"
     },
@@ -371,7 +371,7 @@
       "error": {
         "code": "CONTEXT_SOURCE_KEY_TYPE_UNSUPPORTED",
         "details": {},
-        "message": "Source key type unsupported."
+        "message": "The source key uses an unsupported data type. Use UUID, integer, bigint, text, or varchar."
       },
       "request_id": "req_synthetic"
     },
@@ -379,7 +379,7 @@
       "error": {
         "code": "CONTEXT_SOURCE_KEY_TEXT_CONSTRAINT_REQUIRED",
         "details": {},
-        "message": "Source key text constraint required."
+        "message": "A text source key must reject empty values and enforce the supported byte-length limit."
       },
       "request_id": "req_synthetic"
     },
@@ -387,7 +387,7 @@
       "error": {
         "code": "CONTEXT_SOURCE_PRIVILEGE_REQUIRED",
         "details": {},
-        "message": "Source privilege required."
+        "message": "Polygres does not have the source-table permissions required to read data and install synchronization triggers."
       },
       "request_id": "req_synthetic"
     },
@@ -395,7 +395,7 @@
       "error": {
         "code": "CONTEXT_VECTOR_COLUMN_MISSING",
         "details": {},
-        "message": "Vector column missing."
+        "message": "Add and populate a native pgContext vector column before creating the collection."
       },
       "request_id": "req_synthetic"
     },
@@ -403,7 +403,7 @@
       "error": {
         "code": "CONTEXT_VECTOR_COLUMN_CONFLICT",
         "details": {},
-        "message": "Vector column conflict."
+        "message": "The requested vector column already exists. Choose a different column name or use existing-column mode."
       },
       "request_id": "req_synthetic"
     },
@@ -411,7 +411,7 @@
       "error": {
         "code": "CONTEXT_VECTOR_TYPE_UNSUPPORTED",
         "details": {},
-        "message": "Vector type unsupported."
+        "message": "The vector column type is not supported for this collection. Use a native pgContext vector or a compatible pgvector column."
       },
       "request_id": "req_synthetic"
     },
@@ -419,7 +419,7 @@
       "error": {
         "code": "CONTEXT_VECTOR_NULLABLE",
         "details": {},
-        "message": "Vector nullable."
+        "message": "The vector column contains NULL values. Populate every vector before converting the column."
       },
       "request_id": "req_synthetic"
     },
@@ -427,7 +427,7 @@
       "error": {
         "code": "CONTEXT_VECTOR_DIMENSION_INVALID",
         "details": {},
-        "message": "Vector dimension invalid."
+        "message": "The vector column dimensions do not match the requested collection dimensions."
       },
       "request_id": "req_synthetic"
     },
@@ -1270,7 +1270,8 @@
           "code": "synthetic",
           "details": {},
           "http_status": 0,
-          "message": "synthetic"
+          "message": "synthetic",
+          "variant": null
         },
         "finished_at": "2026-07-29T00:00:00Z",
         "id": "00000000-0000-0000-0000-000000000001",
@@ -1446,7 +1447,8 @@
         "code": "synthetic",
         "details": {},
         "http_status": 0,
-        "message": "synthetic"
+        "message": "synthetic",
+        "variant": null
       },
       "finished_at": "2026-07-29T00:00:00Z",
       "id": "00000000-0000-0000-0000-000000000001",
@@ -1482,7 +1484,8 @@
       "error": {
         "code": "synthetic",
         "details": {},
-        "message": "synthetic"
+        "message": "synthetic",
+        "variant": null
       },
       "request_id": "synthetic"
     },
@@ -1546,7 +1549,8 @@
           "code": "synthetic",
           "details": {},
           "http_status": 0,
-          "message": "synthetic"
+          "message": "synthetic",
+          "variant": null
         },
         "finished_at": "2026-07-29T00:00:00Z",
         "id": "00000000-0000-0000-0000-000000000001",
@@ -1593,7 +1597,8 @@
           "code": "synthetic",
           "details": {},
           "http_status": 0,
-          "message": "synthetic"
+          "message": "synthetic",
+          "variant": null
         },
         "finished_at": "2026-07-29T00:00:00Z",
         "id": "00000000-0000-0000-0000-000000000001",

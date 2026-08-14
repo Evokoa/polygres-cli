@@ -197,6 +197,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_notices_parser(subparsers)
     _add_api_parsers(subparsers)
     _add_context_parsers(subparsers)
+    _add_rows_parsers(subparsers)
     _add_config_parsers(subparsers)
     return parser
 
@@ -267,6 +268,7 @@ def _command_name(args: argparse.Namespace) -> str:
         "kind",
         "api_action",
         "context_action",
+        "rows_action",
         "sources_action",
         "collections_action",
         "filters_action",
@@ -765,6 +767,66 @@ def _add_context_parsers(
     recall.add_argument("--minimum-recall", type=_context_finite_float)
     _add_context_ranked_flags(recall, filters=True)
     recall.set_defaults(func=handle_context_recall_check)
+
+
+def _add_rows_parsers(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser(
+        "rows",
+        help="validate and write one table row through the Runtime API",
+        description=(
+            "Validate or write one JSON object. Use --file - to read the object "
+            "once from standard input."
+        ),
+    )
+    sub = parser.add_subparsers(dest="rows_action", required=True)
+
+    validate = sub.add_parser("validate", help="validate a row write without changing data")
+    _add_row_common_flags(validate)
+    validate.add_argument("--mode", choices=["insert", "upsert", "ignore"], default="insert")
+    validate.add_argument("--conflict-column", action="append", default=[])
+    validate.add_argument("--update-column", action="append")
+    validate.set_defaults(func=handle_rows_validate)
+
+    insert = sub.add_parser("insert", help="insert one row")
+    _add_row_common_flags(insert, execution=True)
+    insert.set_defaults(func=handle_rows_write, row_mode="insert")
+
+    upsert = sub.add_parser("upsert", help="insert or update one row on a unique conflict")
+    _add_row_common_flags(upsert, execution=True)
+    upsert.add_argument("--conflict-column", action="append", required=True)
+    upsert.add_argument("--update-column", action="append")
+    upsert.set_defaults(func=handle_rows_write, row_mode="upsert")
+
+    ignore = sub.add_parser("ignore", help="insert one row or ignore a unique conflict")
+    _add_row_common_flags(ignore, execution=True)
+    ignore.add_argument("--conflict-column", action="append", required=True)
+    ignore.set_defaults(func=handle_rows_write, row_mode="ignore")
+
+
+def _add_row_common_flags(parser: argparse.ArgumentParser, *, execution: bool = False) -> None:
+    parser.add_argument("--schema", default="public")
+    parser.add_argument("--table", required=True)
+    parser.add_argument(
+        "--file",
+        required=True,
+        help="UTF-8 JSON object file, or - to read standard input once",
+    )
+    parser.add_argument("--returning", action="append", default=[])
+    context = parser.add_mutually_exclusive_group()
+    context.add_argument("--context-collection")
+    context.add_argument(
+        "--reconcile-context",
+        action="store_true",
+        help="use the only ready Context collection for this table",
+    )
+    parser.add_argument("--idempotency-key")
+    if execution:
+        wait = parser.add_mutually_exclusive_group()
+        wait.add_argument("--wait", dest="wait", action="store_true", default=True)
+        wait.add_argument("--no-wait", dest="wait", action="store_false")
+        parser.add_argument("--timeout", type=_timeout_seconds, default=1800)
 
 
 def _add_context_operation_flags(parser: argparse.ArgumentParser) -> None:
@@ -1756,6 +1818,250 @@ def handle_context_capabilities(ctx: Context, args: argparse.Namespace) -> int:
     project_id = _resolve_project_id(ctx, None)
     payload = ctx.client.context_capabilities(project_id)
     return _context_emit(ctx, payload, context_capabilities_human)
+
+
+def handle_rows_validate(ctx: Context, args: argparse.Namespace) -> int:
+    request = _row_request(args, mode=args.mode, execution=False)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.rows_validate(
+        project_id,
+        args.schema,
+        args.table,
+        request,
+    )
+    return _emit_row_result(
+        ctx,
+        payload,
+        requested_returning=request.get("returning"),
+    )
+
+
+def handle_rows_write(ctx: Context, args: argparse.Namespace) -> int:
+    request = _row_request(args, mode=args.row_mode, execution=True)
+    project_id = _resolve_project_id(ctx, None)
+    payload = ctx.client.rows_write(
+        project_id,
+        args.schema,
+        args.table,
+        request,
+    )
+    context_result = payload.get("context")
+    if (
+        args.wait
+        and payload.get("status") == "pending"
+        and isinstance(context_result, dict)
+        and context_result.get("operation_id")
+    ):
+        operation_id = str(context_result["operation_id"])
+        try:
+            context_wait_for_operation(
+                ctx.client,
+                project_id=project_id,
+                operation_id=operation_id,
+                timeout_seconds=args.timeout,
+                initial_envelope=None,
+            )
+        except CliError as exc:
+            if exc.code == "CONTEXT_OPERATION_TIMEOUT":
+                return _emit_row_result(
+                    ctx,
+                    payload,
+                    requested_returning=request.get("returning"),
+                )
+            operation_status = exc.details.get("operation_status")
+            if operation_status not in {"failed", "cancelled"}:
+                exc.details.setdefault("operation_id", operation_id)
+                key = request.get("idempotency_key")
+                if isinstance(key, str):
+                    exc.details.setdefault("idempotency_key", key)
+                raise
+            payload["status"] = "partial_failed"
+            context_result["status"] = "partial_failed"
+            context_result["operation_status"] = operation_status
+            context_result["error"] = {
+                "code": "ROW_CONTEXT_RECONCILIATION_FAILED",
+                "message": "The row committed, but Context reconciliation failed.",
+                "retryable": bool(exc.details.get("retryable", False)),
+                "details": {
+                    "operation_id": operation_id,
+                    "underlying_code": exc.code,
+                },
+            }
+        else:
+            payload = ctx.client.rows_write(
+                project_id,
+                args.schema,
+                args.table,
+                request,
+            )
+    return _emit_row_result(
+        ctx,
+        payload,
+        exit_code=UNAVAILABLE if payload.get("status") == "partial_failed" else SUCCESS,
+        requested_returning=request.get("returning"),
+    )
+
+
+def _row_request(
+    args: argparse.Namespace,
+    *,
+    mode: str,
+    execution: bool,
+) -> dict[str, Any]:
+    for value in (args.schema, args.table):
+        if len(value) > 63 or SQL_IDENTIFIER_RE.fullmatch(value) is None:
+            raise CliError(
+                "ROW_REQUEST_INVALID",
+                "Schema and table names must be portable PostgreSQL identifiers.",
+                exit_code=USAGE,
+                details={"field": "identifier"},
+            )
+    row = context_read_object(
+        args.file,
+        file_input=True,
+        code="ROW_REQUEST_INVALID",
+        allow_stdin=True,
+    )
+    if not row:
+        raise CliError(
+            "ROW_REQUEST_INVALID",
+            "The row JSON object must not be empty.",
+            exit_code=USAGE,
+            details={"field": "row"},
+        )
+    conflict_columns = _row_columns(getattr(args, "conflict_column", []), "conflict_column")
+    update_value = getattr(args, "update_column", None)
+    update_columns = (
+        _row_columns(update_value, "update_column") if update_value is not None else None
+    )
+    returning = _row_columns(args.returning, "returning")
+    for column in row:
+        _row_identifier(column, "row")
+    if mode == "insert" and (conflict_columns or update_columns is not None):
+        raise CliError(
+            "ROW_OPTION_INVALID",
+            "Insert does not accept conflict or update columns.",
+            exit_code=USAGE,
+            details={"mode": mode},
+        )
+    if mode in {"upsert", "ignore"} and not conflict_columns:
+        raise CliError(
+            "ROW_CONFLICT_CONSTRAINT_INVALID",
+            "Upsert and ignore require at least one --conflict-column.",
+            exit_code=USAGE,
+        )
+    if mode == "ignore" and update_columns is not None:
+        raise CliError(
+            "ROW_OPTION_INVALID",
+            "Ignore does not accept update columns.",
+            exit_code=USAGE,
+            details={"mode": mode},
+        )
+    requested_context = bool(args.context_collection or args.reconcile_context)
+    if args.context_collection and UUID_LIKE_RE.fullmatch(args.context_collection) is None:
+        raise CliError(
+            "CONTEXT_COLLECTION_NOT_FOUND",
+            "--context-collection must be a UUID.",
+            exit_code=USAGE,
+        )
+    if args.idempotency_key and not requested_context:
+        raise CliError(
+            "ROW_OPTION_INVALID",
+            "--idempotency-key requires Context reconciliation.",
+            exit_code=USAGE,
+            details={"mode": mode},
+        )
+    body: dict[str, Any] = {
+        "mode": mode,
+        "row": row,
+        "returning": returning,
+    }
+    if conflict_columns:
+        body["conflict_columns"] = conflict_columns
+    if update_columns is not None:
+        body["update_columns"] = update_columns
+    if requested_context:
+        body["context"] = {
+            "reconcile": True,
+            **(
+                {"collection_id": args.context_collection}
+                if args.context_collection
+                else {}
+            ),
+        }
+        if execution:
+            body["idempotency_key"] = args.idempotency_key or f"rows-{uuid4()}"
+    return body
+
+
+def _row_columns(values: list[str] | None, field: str) -> list[str]:
+    result = list(values or [])
+    if len(result) != len(set(result)):
+        raise CliError(
+            "ROW_REQUEST_INVALID",
+            f"Duplicate --{field.replace('_', '-')} values are not allowed.",
+            exit_code=USAGE,
+            details={"field": field},
+        )
+    for value in result:
+        _row_identifier(value, field)
+    return result
+
+
+def _row_identifier(value: str, field: str) -> None:
+    if len(value) > 63 or SQL_IDENTIFIER_RE.fullmatch(value) is None:
+        raise CliError(
+            "ROW_REQUEST_INVALID",
+            "Row column names must be portable PostgreSQL identifiers.",
+            exit_code=USAGE,
+            details={"field": field},
+        )
+
+
+def _emit_row_result(
+    ctx: Context,
+    payload: dict[str, Any],
+    *,
+    exit_code: int = SUCCESS,
+    requested_returning: Any = None,
+) -> int:
+    if ctx.json:
+        write_json(redact(payload))
+        return exit_code
+    if not ctx.quiet:
+        context_result = payload.get("context")
+        returned_keys = (
+            [str(value) for value in requested_returning]
+            if isinstance(requested_returning, list)
+            else list(payload.get("returned") or {})
+        )
+        items = [
+            ("operation", payload.get("operation", "validated")),
+            ("table", f"{payload.get('schema')}.{payload.get('table')}"),
+            (
+                "returned keys",
+                ", ".join(returned_keys) if returned_keys else "none",
+            ),
+            ("status", payload.get("status", "valid")),
+        ]
+        if isinstance(context_result, dict):
+            items.extend(
+                [
+                    ("context", context_result.get("status")),
+                    ("operation id", context_result.get("operation_id") or "none"),
+                ]
+            )
+        if payload.get("idempotency_key"):
+            items.append(("idempotency key", payload["idempotency_key"]))
+        if payload.get("request_id"):
+            items.append(("request id", payload["request_id"]))
+        print_kv(items)
+    if exit_code != SUCCESS:
+        sys.stderr.write(
+            "The row committed, but Context reconciliation did not complete. "
+            "Resume the same row operation with the displayed idempotency key.\n"
+        )
+    return exit_code
 
 
 def handle_context_init(ctx: Context, args: argparse.Namespace) -> int:

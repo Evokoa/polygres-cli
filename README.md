@@ -98,13 +98,34 @@ polygres --json --project <project-id> api request \
 
 The CLI validates the route, HTTP method, parameters, and JSON body against its bundled API specification before sending the request. Run with `--dry-run` to inspect a request without executing it.
 
+## Single-row writes
+
+Write one JSON object through the Runtime API without opening a database
+connection. Use a named file or `--file -` for standard input.
+
+```bash
+polygres --project <project-id> rows upsert \
+  --schema public --table memories --file row.json \
+  --conflict-column id --returning id
+
+printf '%s' '{"id":"memory_123","content":"hello"}' | \
+  polygres --project <project-id> rows upsert \
+  --table memories --file - --conflict-column id
+```
+
+Context behavior is never inferred for an ordinary table. Pass
+`--context-collection <uuid>` or `--reconcile-context` to make the same command
+write the row and reconcile one pgContext point. Context-backed commands wait by
+default and display a resumable idempotency key; `--no-wait` returns the durable
+operation ID.
+
 ## Notices and automation
 
 Service and release notices are written to standard error, so standard output and `--json` remain safe for scripts. The CLI never sends command arguments or command output when checking for notices.
 
 ## Version and support
 
-Package version: [`0.2.2`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.2.2).
+Package version: [`0.3.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.3.0).
 
 Useful commands:
 
@@ -123,4 +144,4 @@ Users of the former combined `polygres` package should install both packages sep
 
 ## Changelog
 
-See the [CLI 0.2.2 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.2.2) for release changes.
+See the [CLI 0.3.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.3.0) for release changes.

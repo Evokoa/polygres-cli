@@ -4,6 +4,20 @@ All notable changes to `polygres-cli` are documented in this file.
 
 ## Unreleased
 
+## 0.3.0 - 2026-08-14
+
+### Added
+
+- Added `polygres rows validate`, `insert`, `upsert`, and `ignore` for one JSON
+  object from a file or standard input.
+- Added explicit pgContext reconciliation with generated or supplied resume
+  keys, default durable-operation waiting, and `--no-wait` support.
+
+### Changed
+
+- Row mutations never automatically retry after authentication, transport, or
+  server uncertainty. Ambiguous outcomes use stable exit code 8.
+
 ## 0.2.2 - 2026-08-12
 
 ### Added

@@ -27,6 +27,13 @@ def write_error(error: CliError, *, json_output: bool) -> None:
         write_json(redact(payload), stream=sys.stdout)
     else:
         message = error.message
+        recovery = []
+        for key in ("operation_id", "idempotency_key"):
+            value = error.details.get(key)
+            if isinstance(value, str) and value:
+                recovery.append(f"{key}: {redact(value)}")
+        if recovery:
+            message = f"{message} ({', '.join(recovery)})"
         if error.request_id:
             message = f"{message} (request_id: {error.request_id})"
         sys.stderr.write(message + "\n")

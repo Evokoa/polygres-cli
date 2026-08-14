@@ -71,7 +71,10 @@ def context_wait_for_operation(
                     "CONTEXT_OPERATION_CANCELLED",
                     "Context operation was cancelled.",
                     exit_code=CONFLICT,
-                    details={"operation_id": operation_id},
+                    details={
+                        "operation_id": operation_id,
+                        "operation_status": "cancelled",
+                    },
                     request_id=_operation_request_id(envelope, operation),
                 )
 
@@ -150,7 +153,11 @@ def _failed_operation_error(
             "CONTEXT_OPERATION_FAILED",
             "Context operation failed.",
             exit_code=GENERAL_FAILURE,
-            details={"operation_id": operation_id},
+            details={
+                "operation_id": operation_id,
+                "operation_status": "failed",
+                "retryable": True,
+            },
             request_id=_operation_request_id(envelope, operation),
         )
     status = failure.get("http_status")
@@ -158,6 +165,9 @@ def _failed_operation_error(
     details = failure.get("details")
     safe_details = dict(details) if isinstance(details, dict) else {}
     safe_details.setdefault("operation_id", operation_id)
+    safe_details["operation_status"] = "failed"
+    if isinstance(failure.get("retryable"), bool):
+        safe_details["retryable"] = failure["retryable"]
     return CliError(
         str(failure.get("code") or "CONTEXT_OPERATION_FAILED"),
         str(failure.get("message") or "Context operation failed."),

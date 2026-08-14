@@ -18,6 +18,12 @@ from polygres_cli.cli_errors import (
 
 GrantProvider = Callable[[str, str], dict[str, Any]]
 RETRY_STATUSES = {408, 429, 500, 502, 503, 504}
+MANAGED_RUNTIME_API_DOMAINS = frozenset(
+    {
+        "api.db.polygres.com",
+        "api.staging.db.polygres.com",
+    }
+)
 
 
 class RuntimeClient:
@@ -54,39 +60,39 @@ class RuntimeClient:
         *,
         json: dict[str, Any] | None = None,
         timeout: float | None = None,
+        read_only_retry: bool = False,
+        allow_auth_replay: bool = True,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         method = method.upper()
         refreshed_after_401 = False
         network_attempt = 0
         while True:
             grant = self._grant(project_id, scope)
-            runtime_api_url = validate_runtime_api_url(
-                str(grant["runtime_api_url"]),
-                project_id,
-                allow_local_http=self._allow_local_http,
-            )
+            runtime_api_url = str(grant["runtime_api_url"])
             url = f"{runtime_api_url}{path}"
-            headers = {
+            request_headers = {
                 "Accept": "application/json",
                 "Authorization": f"Bearer {grant['access_token']}",
                 **self._telemetry_headers,
+                **(headers or {}),
             }
             if json is not None:
-                headers["Content-Type"] = "application/json"
+                request_headers["Content-Type"] = "application/json"
             try:
                 response = self._client.request(
                     method,
                     url,
-                    headers=headers,
+                    headers=request_headers,
                     json=json,
                     timeout=timeout,
                 )
             except (httpx.TimeoutException, httpx.NetworkError):
-                if method == "GET" and network_attempt < self._max_retries:
+                if (method == "GET" or read_only_retry) and network_attempt < self._max_retries:
                     network_attempt += 1
                     continue
                 raise
-            if response.status_code == 401 and not refreshed_after_401:
+            if response.status_code == 401 and allow_auth_replay and not refreshed_after_401:
                 refreshed_after_401 = True
                 self._grants.pop((project_id, scope), None)
                 continue
@@ -94,7 +100,7 @@ class RuntimeClient:
             if is_maintenance_error_payload(payload):
                 raise api_error_from_response(response.status_code, payload)
             if (
-                method == "GET"
+                (method == "GET" or read_only_retry)
                 and response.status_code in RETRY_STATUSES
                 and network_attempt < self._max_retries
             ):
@@ -114,7 +120,7 @@ class RuntimeClient:
             return payload
 
     def _grant(self, project_id: str, scope: str) -> dict[str, Any]:
-        if scope not in {"graph:read", "graph:manage"}:
+        if scope not in {"graph:read", "graph:manage", "rows:write"}:
             raise ValueError("Runtime grant scope is invalid")
         key = (project_id, scope)
         cached = self._grants.get(key)
@@ -137,11 +143,21 @@ class RuntimeClient:
                 "If it happens again, contact support.",
                 exit_code=UNAVAILABLE,
             )
-        validate_runtime_api_url(
-            str(value.get("runtime_api_url") or ""),
-            project_id,
-            allow_local_http=self._allow_local_http,
-        )
+        try:
+            runtime_api_url = validate_runtime_api_url(
+                str(value.get("runtime_api_url") or ""),
+                project_id,
+                allow_local_http=self._allow_local_http,
+            )
+        except ValueError as exc:
+            request_id = value.get("request_id")
+            raise CliError(
+                "RUNTIME_GRANT_INVALID",
+                "The Runtime API returned an invalid access URL. Retry the command. "
+                "If it happens again, contact support.",
+                exit_code=UNAVAILABLE,
+                request_id=request_id if isinstance(request_id, str) else None,
+            ) from exc
         if _expiry(value) <= self._now().timestamp():
             raise CliError(
                 "RUNTIME_GRANT_INVALID",
@@ -149,17 +165,23 @@ class RuntimeClient:
                 "a new grant. If the new grant is also expired, contact support.",
                 exit_code=UNAVAILABLE,
             )
-        self._grants[key] = value
-        return value
+        normalized = dict(value)
+        normalized["runtime_api_url"] = runtime_api_url
+        self._grants[key] = normalized
+        return normalized
 
 
 def validate_runtime_api_url(value: str, project_id: str, *, allow_local_http: bool = False) -> str:
     parsed = urlsplit(value)
     loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+    managed_hosts = {
+        f"{project_id}.{runtime_domain}" for runtime_domain in MANAGED_RUNTIME_API_DOMAINS
+    }
     if (
         not parsed.netloc
         or parsed.username is not None
         or parsed.password is not None
+        or (parsed.port is not None and not (allow_local_http and loopback))
         or parsed.query
         or parsed.fragment
         or parsed.path != "/v1"
@@ -169,7 +191,7 @@ def validate_runtime_api_url(value: str, project_id: str, *, allow_local_http: b
         )
         or (
             not (allow_local_http and loopback)
-            and parsed.hostname != f"{project_id}.api.db.polygres.com"
+            and parsed.hostname not in managed_hosts
         )
     ):
         raise ValueError("Runtime API URL is invalid")

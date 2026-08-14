@@ -14,6 +14,7 @@ import pytest
 import respx
 
 from polygres_cli import __version__, cli, cli_client
+from polygres_cli._vendor.polygres_lib.errors import catalog_message
 from polygres_cli.cli_auth import normalize_poll_response, validate_start_response
 from polygres_cli.cli_client import CliControlPlaneClient
 from polygres_cli.cli_config import ConfigStore, default_config_path
@@ -2555,7 +2556,7 @@ def test_client_maintenance_response_is_not_retried(
     assert route.call_count == 1
     assert sleeps == []
     assert exc.value.code == "MAINTENANCE_FULL"
-    assert exc.value.message == "Database upgrades are in progress."
+    assert exc.value.message == catalog_message("MAINTENANCE_FULL")
 
 
 @ROUTE_CTX

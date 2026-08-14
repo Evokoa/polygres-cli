@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from polygres_cli._vendor.polygres_lib.auth import AUTH_ERROR_CATALOG, AuthErrorCode
+from polygres_cli._vendor.polygres_lib.errors import ERROR_CATALOG
 
 SUCCESS = 0
 GENERAL_FAILURE = 1
@@ -40,6 +41,8 @@ class CliError(Exception):
     exit_code: int = GENERAL_FAILURE
     details: dict[str, Any] = field(default_factory=dict)
     request_id: str | None = None
+    status_code: int | None = None
+    server_code_declared: bool = False
 
     def __str__(self) -> str:
         return self.message
@@ -52,10 +55,10 @@ class UsageError(CliError):
 
 def is_maintenance_error_payload(payload: dict[str, Any] | None) -> bool:
     error = (payload or {}).get("error")
-    return (
-        isinstance(error, dict)
-        and error.get("code") in {"MAINTENANCE_READ_ONLY", "MAINTENANCE_FULL"}
-    )
+    return isinstance(error, dict) and error.get("code") in {
+        "MAINTENANCE_READ_ONLY",
+        "MAINTENANCE_FULL",
+    }
 
 
 def api_error_from_response(status_code: int, payload: dict[str, Any] | None) -> CliError:
@@ -63,30 +66,47 @@ def api_error_from_response(status_code: int, payload: dict[str, Any] | None) ->
     error = payload.get("error")
     if not isinstance(error, dict):
         error = {}
+    server_code_declared = isinstance(error.get("code"), str) and bool(error["code"])
     code = str(error.get("code") or _default_code(status_code))
     canonical_code = _LEGACY_AUTH_CODES.get(code, code)
     verification_failure = code in {
         "VECTOR_INDEX_VERIFICATION_FAILED",
         "GRAPH_ACTIVATION_VERIFICATION_FAILED",
     }
-    try:
-        return auth_failure(
-            canonical_code,
-            details=error.get("details") if isinstance(error.get("details"), dict) else {},
-            request_id=payload.get("request_id"),
-        )
-    except ValueError:
+    descriptor = ERROR_CATALOG.get(canonical_code)
+    supplied_details = error.get("details") if isinstance(error.get("details"), dict) else {}
+    if descriptor is not None:
+        variant_name = error.get("variant")
+        variant = descriptor.variants.get(variant_name) if isinstance(variant_name, str) else None
+        exit_code = descriptor.cli_exit_code
+        if variant is not None and variant.http_status != descriptor.http_status:
+            exit_code = HTTP_EXIT_CODES.get(variant.http_status, exit_code)
         return CliError(
-            code=code,
-            message=str(error.get("message") or _default_message(status_code)),
-            details=error.get("details") if isinstance(error.get("details"), dict) else {},
+            code=canonical_code,
+            message=variant.message if variant is not None else descriptor.message,
+            details={
+                key: value
+                for key, value in supplied_details.items()
+                if key in descriptor.safe_detail_fields
+            },
             request_id=payload.get("request_id"),
-            exit_code=(
-                GENERAL_FAILURE
-                if verification_failure
-                else HTTP_EXIT_CODES.get(status_code, GENERAL_FAILURE)
-            ),
+            exit_code=exit_code,
+            status_code=status_code,
+            server_code_declared=server_code_declared,
         )
+    return CliError(
+        code=code,
+        message=str(error.get("message") or _default_message(status_code)),
+        details=supplied_details,
+        request_id=payload.get("request_id"),
+        status_code=status_code,
+        server_code_declared=server_code_declared,
+        exit_code=(
+            GENERAL_FAILURE
+            if verification_failure
+            else HTTP_EXIT_CODES.get(status_code, GENERAL_FAILURE)
+        ),
+    )
 
 
 _LEGACY_AUTH_CODES = {
@@ -111,9 +131,7 @@ def auth_failure(
         raise ValueError(f"unknown auth error code: {code}") from exc
     descriptor = AUTH_ERROR_CATALOG[auth_code]
     safe_details = {
-        key: value
-        for key, value in (details or {}).items()
-        if key in descriptor.safe_detail_keys
+        key: value for key, value in (details or {}).items() if key in descriptor.safe_detail_keys
     }
     return CliError(
         code=descriptor.code.value,
@@ -148,8 +166,7 @@ def _default_message(status_code: int) -> str:
         )
     if status_code == 404:
         return (
-            "Resource not found. Check the resource identifier and command context "
-            "before retrying."
+            "Resource not found. Check the resource identifier and command context before retrying."
         )
     if status_code == 429:
         return "Request limit reached. Wait for the retry period before trying again."

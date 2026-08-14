@@ -290,4 +290,8 @@ def test_wait_terminal_errors(
 
     assert exc_info.value.code == code
     assert exc_info.value.exit_code == exit_code
+    assert exc_info.value.details["operation_id"] == OPERATION_ID
+    assert exc_info.value.details["operation_status"] == status
+    if status == "failed" and error is None:
+        assert exc_info.value.details["retryable"] is True
     assert client.calls == 0

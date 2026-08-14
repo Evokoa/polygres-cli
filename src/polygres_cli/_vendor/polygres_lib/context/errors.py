@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from ..errors import ERROR_CATALOG
+
 
 class ContextErrorCode(str, Enum):
     REQUEST_INVALID = "CONTEXT_REQUEST_INVALID"
@@ -73,190 +75,25 @@ class ContextErrorDescriptor:
     availability: bool = False
 
 
-def _descriptor(
-    status: int,
-    message: str,
-    *details: str,
-    retryable: bool = False,
-    conflict: bool = False,
-    availability: bool = False,
-) -> ContextErrorDescriptor:
-    return ContextErrorDescriptor(
-        status_code=status,
-        message=message,
-        safe_detail_fields=details,
-        retryable=retryable,
-        conflict=conflict,
-        availability=availability,
-    )
-
-
 CONTEXT_ERROR_CATALOG: dict[ContextErrorCode, ContextErrorDescriptor] = {
-    ContextErrorCode.REQUEST_INVALID: _descriptor(400, "Context request is invalid.", "field"),
-    ContextErrorCode.IDENTIFIER_INVALID: _descriptor(
-        400, "Context identifier is invalid.", "field"
-    ),
-    ContextErrorCode.SOURCE_INVALID: _descriptor(400, "Context source is invalid.", "field"),
-    ContextErrorCode.DELETE_CONFIRMATION_INVALID: _descriptor(
-        400, "Collection deletion confirmation is invalid.", "collection_id"
-    ),
-    ContextErrorCode.POINT_KEY_INVALID: _descriptor(
-        400, "Context point key is invalid.", "field", "index"
-    ),
-    ContextErrorCode.EMBEDDING_INVALID: _descriptor(
-        400,
-        "Context embedding is invalid.",
-        "expected_dimensions",
-        "actual_dimensions",
-    ),
-    ContextErrorCode.FILTER_INVALID: _descriptor(
-        400, "Context filter is invalid.", "field", "limit"
-    ),
-    ContextErrorCode.LIMIT_EXCEEDED: _descriptor(
-        400, "Context request exceeds a limit.", "field", "limit"
-    ),
-    ContextErrorCode.GRAPH_START_REQUIRED: _descriptor(
-        400, "A graph start entity is required.", "mode"
-    ),
-    ContextErrorCode.GRAPH_DIRECTION_INVALID: _descriptor(
-        400, "Graph direction is invalid.", "direction"
-    ),
-    ContextErrorCode.RANKING_WEIGHTS_INVALID: _descriptor(
-        400, "Rank-fusion weights are invalid.", "context_weight", "graph_weight"
-    ),
-    ContextErrorCode.RESOURCE_NAMESPACE_MISMATCH: _descriptor(
-        400,
-        "The resource belongs to another retrieval namespace.",
-        "expected_namespace",
-        "provided_namespace",
-    ),
-    ContextErrorCode.COLLECTION_NOT_FOUND: _descriptor(
-        404, "Context collection was not found.", "collection"
-    ),
-    ContextErrorCode.OPERATION_NOT_FOUND: _descriptor(
-        404, "Context operation was not found.", "operation_id"
-    ),
-    ContextErrorCode.COLLECTION_NOT_READY: _descriptor(
-        409,
-        "Context collection is not ready.",
-        "collection_id",
-        "status",
-        conflict=True,
-        availability=True,
-    ),
-    ContextErrorCode.TEXT_COLUMN_REQUIRED: _descriptor(
-        409,
-        "The collection does not have a configured text column.",
-        "collection_id",
-        conflict=True,
-        availability=True,
-    ),
-    ContextErrorCode.GRAPH_NOT_READY: _descriptor(
-        409,
-        "Graph retrieval is not ready.",
-        "graph_status",
-        conflict=True,
-        availability=True,
-    ),
-    ContextErrorCode.SOURCE_KEY_ALIGNMENT_INVALID: _descriptor(
-        409,
-        "Context and graph source identities do not align.",
-        "collection_id",
-        "reason",
-        conflict=True,
-    ),
-    ContextErrorCode.CAPABILITY_UNAVAILABLE: _descriptor(
-        409,
-        "Context capability is unavailable.",
-        "capability",
-        "blocker",
-        conflict=True,
-        availability=True,
-    ),
-    ContextErrorCode.SOURCE_KEY_NOT_FOUND: _descriptor(
-        409,
-        "One or more source keys were not found.",
-        "collection_id",
-        "count",
-        conflict=True,
-    ),
-    ContextErrorCode.SOURCE_VECTOR_INVALID: _descriptor(
-        409,
-        "One or more source vectors are invalid.",
-        "collection_id",
-        "count",
-        "reason",
-        conflict=True,
-    ),
-    ContextErrorCode.FILTER_REGISTRATION_CONFLICT: _descriptor(
-        409,
-        "The filter key is already registered to a different source.",
-        "collection_id",
-        "key",
-        conflict=True,
-    ),
-    ContextErrorCode.POINT_CURSOR_INVALID: _descriptor(400, "Point cursor is invalid.", "field"),
-    ContextErrorCode.RECALL_UNAVAILABLE: _descriptor(
-        409,
-        "Recall checking is unavailable for this collection.",
-        "collection_id",
-        "reason",
-        conflict=True,
-        availability=True,
-    ),
-    ContextErrorCode.COLLECTION_NAME_CONFLICT: _descriptor(
-        409, "Context collection name is already in use.", "name", conflict=True
-    ),
-    ContextErrorCode.PREFLIGHT_BLOCKED: _descriptor(
-        409,
-        "Context preflight blocked collection creation.",
-        "blocker",
-        "field",
-        conflict=True,
-    ),
-    ContextErrorCode.OPERATION_CONFLICT: _descriptor(
-        409,
-        "Another Context operation owns this resource.",
-        "operation_id",
-        "collection_id",
-        conflict=True,
-        retryable=True,
-    ),
-    ContextErrorCode.IDEMPOTENCY_CONFLICT: _descriptor(
-        409,
-        "Idempotency key was used for a different request.",
-        "field",
-        conflict=True,
-    ),
-    ContextErrorCode.OPERATION_NOT_CANCELLABLE: _descriptor(
-        409,
-        "Context operation cannot be cancelled.",
-        "operation_id",
-        "status",
-        conflict=True,
-    ),
-    ContextErrorCode.OPERATION_NOT_RETRYABLE: _descriptor(
-        409,
-        "Context operation cannot be retried.",
-        "operation_id",
-        "status",
-        conflict=True,
-    ),
-    ContextErrorCode.OPERATION_CANCELLED: _descriptor(
-        409, "Context operation was cancelled.", "operation_id", conflict=True
-    ),
-}
-
-for _code in ContextErrorCode:
-    CONTEXT_ERROR_CATALOG.setdefault(
-        _code,
-        _descriptor(
-            409,
-            _code.value.replace("CONTEXT_", "").replace("_", " ").capitalize() + ".",
-            "field",
-            conflict=True,
+    code: ContextErrorDescriptor(
+        status_code=ERROR_CATALOG[code.value].http_status,
+        message=ERROR_CATALOG[code.value].message,
+        safe_detail_fields=tuple(sorted(ERROR_CATALOG[code.value].safe_detail_fields)),
+        retryable=ERROR_CATALOG[code.value].retry_class
+        in {"bounded_retry", "dependency_retry", "after_delay"},
+        conflict=ERROR_CATALOG[code.value].http_status == 409,
+        availability=(
+            "UNAVAILABLE" in code.value
+            or "NOT_READY" in code.value
+            or code is ContextErrorCode.MEMORY_PRESSURE
         ),
     )
+    for code in ContextErrorCode
+}
+
+if set(CONTEXT_ERROR_CATALOG) != set(ContextErrorCode):
+    raise RuntimeError("global error catalog must define every ContextErrorCode exactly once")
 
 
 __all__ = [
