@@ -138,6 +138,117 @@
         "title": "ApplicationPermissionCheck",
         "type": "object"
       },
+      "BackfillPointsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "batch_size": {
+            "default": 1000,
+            "minimum": 1.0,
+            "title": "Batch Size",
+            "type": "integer"
+          },
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collection"
+        ],
+        "title": "BackfillPointsRequest",
+        "type": "object"
+      },
+      "BulkPointKeysRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "batch_size": {
+            "default": 1000,
+            "minimum": 1.0,
+            "title": "Batch Size",
+            "type": "integer"
+          },
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "source_keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Source Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_keys",
+          "collection"
+        ],
+        "title": "BulkPointKeysRequest",
+        "type": "object"
+      },
+      "CandidateSearchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_point_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Candidate Point Ids",
+            "type": "array"
+          },
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "embedding": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Embedding",
+            "type": "array"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "limit": {
+            "default": 10,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "vector_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Name"
+          }
+        },
+        "required": [
+          "collection",
+          "embedding",
+          "candidate_point_ids"
+        ],
+        "title": "CandidateSearchRequest",
+        "type": "object"
+      },
       "CapabilitiesResponse": {
         "additionalProperties": true,
         "properties": {
@@ -366,6 +477,9 @@
             "title": "Max Values Per Match",
             "type": "integer"
           },
+          "pgcontext_compatibility": {
+            "$ref": "#/components/schemas/PgContextCompatibilityCapabilities"
+          },
           "point_scroll": {
             "title": "Point Scroll",
             "type": "boolean"
@@ -544,6 +658,7 @@
           "request_id",
           "contract_version",
           "product_status",
+          "pgcontext_compatibility",
           "runtime",
           "setup",
           "setup_blocker",
@@ -588,6 +703,30 @@
           "max_point_keys_per_operation"
         ],
         "title": "CapabilitiesResponse",
+        "type": "object"
+      },
+      "ClearPayloadRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "source_keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Source Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_keys",
+          "collection"
+        ],
+        "title": "ClearPayloadRequest",
         "type": "object"
       },
       "CliAuthApproveRequest": {
@@ -854,6 +993,108 @@
         "title": "CliNoticesResponse",
         "type": "object"
       },
+      "CollectionAlias": {
+        "additionalProperties": true,
+        "properties": {
+          "alias_name": {
+            "title": "Alias Name",
+            "type": "string"
+          },
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias_name",
+          "collection_name"
+        ],
+        "title": "CollectionAlias",
+        "type": "object"
+      },
+      "CollectionAliasDropResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "alias_name": {
+            "title": "Alias Name",
+            "type": "string"
+          },
+          "dropped": {
+            "title": "Dropped",
+            "type": "boolean"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "alias_name",
+          "dropped"
+        ],
+        "title": "CollectionAliasDropResponse",
+        "type": "object"
+      },
+      "CollectionAliasListResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "aliases": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionAlias"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "aliases"
+        ],
+        "title": "CollectionAliasListResponse",
+        "type": "object"
+      },
+      "CollectionAliasRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "alias_name": {
+            "title": "Alias Name",
+            "type": "string"
+          },
+          "target_collection_name": {
+            "title": "Target Collection Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alias_name",
+          "target_collection_name"
+        ],
+        "title": "CollectionAliasRequest",
+        "type": "object"
+      },
+      "CollectionAliasResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "alias": {
+            "$ref": "#/components/schemas/CollectionAlias"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "alias"
+        ],
+        "title": "CollectionAliasResponse",
+        "type": "object"
+      },
       "CollectionCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -957,6 +1198,250 @@
           "deletion_plan"
         ],
         "title": "CollectionGetResponse",
+        "type": "object"
+      },
+      "CollectionLimits": {
+        "additionalProperties": true,
+        "properties": {
+          "max_candidate_budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Candidate Budget"
+          },
+          "max_dimensions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Dimensions"
+          },
+          "max_filter_nodes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Filter Nodes"
+          },
+          "max_index_memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Index Memory Bytes"
+          },
+          "max_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Points"
+          },
+          "max_search_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Search Limit"
+          },
+          "max_vectors": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Vectors"
+          },
+          "query_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Timeout Ms"
+          },
+          "strict_mode": {
+            "title": "Strict Mode",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "strict_mode",
+          "max_dimensions",
+          "max_vectors",
+          "max_points",
+          "max_filter_nodes",
+          "max_search_limit",
+          "max_candidate_budget",
+          "query_timeout_ms",
+          "max_index_memory_bytes"
+        ],
+        "title": "CollectionLimits",
+        "type": "object"
+      },
+      "CollectionLimitsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "max_candidate_budget": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Candidate Budget"
+          },
+          "max_dimensions": {
+            "anyOf": [
+              {
+                "maximum": 16000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Dimensions"
+          },
+          "max_filter_nodes": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Filter Nodes"
+          },
+          "max_index_memory_bytes": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Index Memory Bytes"
+          },
+          "max_points": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Points"
+          },
+          "max_search_limit": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Search Limit"
+          },
+          "max_vectors": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Vectors"
+          },
+          "query_timeout_ms": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Timeout Ms"
+          },
+          "strict_mode": {
+            "title": "Strict Mode",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "strict_mode"
+        ],
+        "title": "CollectionLimitsRequest",
+        "type": "object"
+      },
+      "CollectionLimitsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/CollectionLimits"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "collection_name",
+          "limits"
+        ],
+        "title": "CollectionLimitsResponse",
         "type": "object"
       },
       "CollectionListResponse": {
@@ -1203,6 +1688,33 @@
           }
         },
         "title": "CollectionUpdateRequest",
+        "type": "object"
+      },
+      "CollectionVectorsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "vectors": {
+            "items": {
+              "$ref": "#/components/schemas/PgContextVectorMetadata"
+            },
+            "title": "Vectors",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "collection_name",
+          "vectors"
+        ],
+        "title": "CollectionVectorsResponse",
         "type": "object"
       },
       "ContextCollection": {
@@ -2323,6 +2835,36 @@
         "title": "ContextOperationStatus",
         "type": "string"
       },
+      "ContextPointDiscoveryRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "context_point_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Context Point Ids",
+            "type": "array"
+          },
+          "limit": {
+            "default": 10,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "collection",
+          "context_point_ids"
+        ],
+        "title": "ContextPointDiscoveryRequest",
+        "type": "object"
+      },
       "ContextPointReconciliationStatus": {
         "enum": [
           "pending",
@@ -2333,6 +2875,262 @@
         ],
         "title": "ContextPointReconciliationStatus",
         "type": "string"
+      },
+      "ContextQueryPlan": {
+        "additionalProperties": false,
+        "description": "Immutable JSON query plan compatible with pgContext 0.2.0 builders.",
+        "properties": {
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContextQueryPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "branches": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContextQueryPlan"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branches"
+          },
+          "candidates_per_query": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidates Per Query"
+          },
+          "context_point_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Point Ids"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula"
+          },
+          "kind": {
+            "enum": [
+              "nearest",
+              "sparse_nearest",
+              "full_text",
+              "late_interaction",
+              "recommend",
+              "discover",
+              "lookup",
+              "prefetch",
+              "weight",
+              "score_threshold",
+              "formula",
+              "rerank"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "max_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Score"
+          },
+          "min_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Score"
+          },
+          "negative_point_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative Point Ids"
+          },
+          "point_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Point Ids"
+          },
+          "positive_point_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Point Ids"
+          },
+          "query_vectors": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Vectors"
+          },
+          "text_column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Column"
+          },
+          "text_query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Query"
+          },
+          "vector": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector"
+          },
+          "vector_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Name"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "ContextQueryPlan",
+        "type": "object"
       },
       "ContextRankedMode": {
         "enum": [
@@ -2827,6 +3625,54 @@
         "title": "CountResponse",
         "type": "object"
       },
+      "CreateEmbeddingMigrationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "source_model_name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source Model Name",
+            "type": "string"
+          },
+          "source_model_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source Model Version",
+            "type": "string"
+          },
+          "target_model_name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Target Model Name",
+            "type": "string"
+          },
+          "target_model_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Target Model Version",
+            "type": "string"
+          },
+          "total_points": {
+            "minimum": 0.0,
+            "title": "Total Points",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "collection",
+          "source_model_name",
+          "source_model_version",
+          "target_model_name",
+          "target_model_version",
+          "total_points"
+        ],
+        "title": "CreateEmbeddingMigrationRequest",
+        "type": "object"
+      },
       "CsvUploadCompleteRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2948,6 +3794,39 @@
           "file_size_bytes"
         ],
         "title": "CsvUploadSessionRequest",
+        "type": "object"
+      },
+      "DeletePayloadRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "payload_keys": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Payload Keys",
+            "type": "array"
+          },
+          "source_keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Source Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_keys",
+          "collection",
+          "payload_keys"
+        ],
+        "title": "DeletePayloadRequest",
         "type": "object"
       },
       "DeletionPlan": {
@@ -3197,6 +4076,13 @@
             ],
             "title": "Classification"
           },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryColumn"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
           "reasons": {
             "items": {
               "$ref": "#/components/schemas/DiscoveryReason"
@@ -3222,6 +4108,35 @@
           "reasons"
         ],
         "title": "DiscoveryCandidate",
+        "type": "object"
+      },
+      "DiscoveryColumn": {
+        "additionalProperties": true,
+        "properties": {
+          "column_name": {
+            "title": "Column Name",
+            "type": "string"
+          },
+          "data_type": {
+            "title": "Data Type",
+            "type": "string"
+          },
+          "nullable": {
+            "title": "Nullable",
+            "type": "boolean"
+          },
+          "ordinal_position": {
+            "title": "Ordinal Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "column_name",
+          "data_type",
+          "nullable",
+          "ordinal_position"
+        ],
+        "title": "DiscoveryColumn",
         "type": "object"
       },
       "DiscoveryReason": {
@@ -3376,6 +4291,82 @@
           "evidence"
         ],
         "title": "EmailVerificationCompletionCommand",
+        "type": "object"
+      },
+      "EmbeddingMigrationRow": {
+        "additionalProperties": true,
+        "properties": {
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "migration_id": {
+            "title": "Migration Id",
+            "type": "integer"
+          },
+          "processed_points": {
+            "title": "Processed Points",
+            "type": "integer"
+          },
+          "source_model": {
+            "title": "Source Model",
+            "type": "string"
+          },
+          "source_version": {
+            "title": "Source Version",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_model": {
+            "title": "Target Model",
+            "type": "string"
+          },
+          "target_version": {
+            "title": "Target Version",
+            "type": "string"
+          },
+          "total_points": {
+            "title": "Total Points",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "migration_id",
+          "collection_name",
+          "source_model",
+          "source_version",
+          "target_model",
+          "target_version",
+          "status",
+          "total_points",
+          "processed_points"
+        ],
+        "title": "EmbeddingMigrationRow",
+        "type": "object"
+      },
+      "EmbeddingMigrationsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingMigrationRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "EmbeddingMigrationsResponse",
         "type": "object"
       },
       "EmptyRequest": {
@@ -4498,6 +5489,340 @@
         "title": "HybridRequest",
         "type": "object"
       },
+      "IndexAdvisorResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/IndexAdvisorRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "IndexAdvisorResponse",
+        "type": "object"
+      },
+      "IndexAdvisorRow": {
+        "additionalProperties": true,
+        "properties": {
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "column_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Name"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "filter_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter Key"
+          },
+          "recommendation": {
+            "title": "Recommendation",
+            "type": "string"
+          },
+          "suggested_sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Sql"
+          }
+        },
+        "required": [
+          "collection_name",
+          "filter_key",
+          "column_name",
+          "recommendation",
+          "detail",
+          "suggested_sql"
+        ],
+        "title": "IndexAdvisorRow",
+        "type": "object"
+      },
+      "IndexDiagnosticsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/IndexDiagnosticsRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "IndexDiagnosticsResponse",
+        "type": "object"
+      },
+      "IndexDiagnosticsRow": {
+        "additionalProperties": true,
+        "properties": {
+          "access_method": {
+            "title": "Access Method",
+            "type": "string"
+          },
+          "context_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Error"
+          },
+          "index_name": {
+            "title": "Index Name",
+            "type": "string"
+          },
+          "index_schema": {
+            "title": "Index Schema",
+            "type": "string"
+          },
+          "repair_advice": {
+            "title": "Repair Advice",
+            "type": "string"
+          },
+          "sqlstate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sqlstate"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          },
+          "table_schema": {
+            "title": "Table Schema",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index_schema",
+          "index_name",
+          "table_schema",
+          "table_name",
+          "access_method",
+          "status",
+          "context_error",
+          "sqlstate",
+          "repair_advice"
+        ],
+        "title": "IndexDiagnosticsRow",
+        "type": "object"
+      },
+      "IndexMemoryEstimateResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/IndexMemoryEstimateRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "IndexMemoryEstimateResponse",
+        "type": "object"
+      },
+      "IndexMemoryEstimateRow": {
+        "additionalProperties": true,
+        "properties": {
+          "access_method": {
+            "title": "Access Method",
+            "type": "string"
+          },
+          "dimensions": {
+            "title": "Dimensions",
+            "type": "integer"
+          },
+          "estimated_rows": {
+            "title": "Estimated Rows",
+            "type": "integer"
+          },
+          "index_name": {
+            "title": "Index Name",
+            "type": "string"
+          },
+          "index_schema": {
+            "title": "Index Schema",
+            "type": "string"
+          },
+          "link_bytes": {
+            "title": "Link Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          },
+          "table_schema": {
+            "title": "Table Schema",
+            "type": "string"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          },
+          "vector_bytes": {
+            "title": "Vector Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index_schema",
+          "index_name",
+          "table_schema",
+          "table_name",
+          "access_method",
+          "estimated_rows",
+          "dimensions",
+          "vector_bytes",
+          "link_bytes",
+          "total_bytes",
+          "status"
+        ],
+        "title": "IndexMemoryEstimateRow",
+        "type": "object"
+      },
+      "IndexStatusResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/IndexStatusRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "IndexStatusResponse",
+        "type": "object"
+      },
+      "IndexStatusRow": {
+        "additionalProperties": true,
+        "properties": {
+          "access_method": {
+            "title": "Access Method",
+            "type": "string"
+          },
+          "index_name": {
+            "title": "Index Name",
+            "type": "string"
+          },
+          "index_schema": {
+            "title": "Index Schema",
+            "type": "string"
+          },
+          "is_live": {
+            "title": "Is Live",
+            "type": "boolean"
+          },
+          "is_ready": {
+            "title": "Is Ready",
+            "type": "boolean"
+          },
+          "is_valid": {
+            "title": "Is Valid",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          },
+          "table_schema": {
+            "title": "Table Schema",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index_schema",
+          "index_name",
+          "table_schema",
+          "table_name",
+          "access_method",
+          "is_valid",
+          "is_ready",
+          "is_live",
+          "status"
+        ],
+        "title": "IndexStatusRow",
+        "type": "object"
+      },
       "JointFusionMetadata": {
         "additionalProperties": true,
         "properties": {
@@ -4926,6 +6251,67 @@
         "title": "MigrationCreateRequest",
         "type": "object"
       },
+      "ModelVersionRow": {
+        "additionalProperties": true,
+        "properties": {
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "dimensions": {
+            "title": "Dimensions",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "model_name": {
+            "title": "Model Name",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collection_name",
+          "model_name",
+          "model_version",
+          "dimensions",
+          "metric",
+          "is_active"
+        ],
+        "title": "ModelVersionRow",
+        "type": "object"
+      },
+      "ModelVersionsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ModelVersionRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "ModelVersionsResponse",
+        "type": "object"
+      },
       "OperationEnvelope": {
         "additionalProperties": true,
         "properties": {
@@ -4981,6 +6367,101 @@
           "has_more"
         ],
         "title": "OperationListResponse",
+        "type": "object"
+      },
+      "OptimizationStatusResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/OptimizationStatusRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "OptimizationStatusResponse",
+        "type": "object"
+      },
+      "OptimizationStatusRow": {
+        "additionalProperties": true,
+        "properties": {
+          "active_points": {
+            "title": "Active Points",
+            "type": "integer"
+          },
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "filter_fields": {
+            "title": "Filter Fields",
+            "type": "integer"
+          },
+          "has_source_table": {
+            "title": "Has Source Table",
+            "type": "boolean"
+          },
+          "hnsw_indexes": {
+            "title": "Hnsw Indexes",
+            "type": "integer"
+          },
+          "registered_vectors": {
+            "title": "Registered Vectors",
+            "type": "integer"
+          },
+          "source_table_exists": {
+            "title": "Source Table Exists",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Name"
+          },
+          "table_schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Schema"
+          }
+        },
+        "required": [
+          "collection_name",
+          "table_schema",
+          "table_name",
+          "has_source_table",
+          "source_table_exists",
+          "registered_vectors",
+          "active_points",
+          "filter_fields",
+          "hnsw_indexes",
+          "status"
+        ],
+        "title": "OptimizationStatusRow",
         "type": "object"
       },
       "OrganizationInvitationCreateRequest": {
@@ -5086,6 +6567,47 @@
         "title": "OrganizationSettingsUpdateRequest",
         "type": "object"
       },
+      "PayloadMutationResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/PayloadMutationResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "results"
+        ],
+        "title": "PayloadMutationResponse",
+        "type": "object"
+      },
+      "PayloadMutationResult": {
+        "additionalProperties": true,
+        "properties": {
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source_key",
+          "updated"
+        ],
+        "title": "PayloadMutationResult",
+        "type": "object"
+      },
       "Permission": {
         "enum": [
           "platform:admin:access",
@@ -5149,6 +6671,233 @@
         "title": "PermissionCheckRequest",
         "type": "object"
       },
+      "PgContextCollectionInfo": {
+        "additionalProperties": true,
+        "properties": {
+          "collection_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Collection Id",
+            "type": "integer"
+          },
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "owner_name": {
+            "title": "Owner Name",
+            "type": "string"
+          },
+          "table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Name"
+          },
+          "table_schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Schema"
+          }
+        },
+        "required": [
+          "collection_id",
+          "collection_name",
+          "owner_name",
+          "table_schema",
+          "table_name"
+        ],
+        "title": "PgContextCollectionInfo",
+        "type": "object"
+      },
+      "PgContextCollectionInfoResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "collection": {
+            "$ref": "#/components/schemas/PgContextCollectionInfo"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "collection"
+        ],
+        "title": "PgContextCollectionInfoResponse",
+        "type": "object"
+      },
+      "PgContextCompatibilityCapabilities": {
+        "additionalProperties": true,
+        "properties": {
+          "aligned": {
+            "title": "Aligned",
+            "type": "integer"
+          },
+          "deferred": {
+            "title": "Deferred",
+            "type": "integer"
+          },
+          "managed_equivalent": {
+            "title": "Managed Equivalent",
+            "type": "integer"
+          },
+          "missing_sdk": {
+            "const": 0,
+            "title": "Missing Sdk",
+            "type": "integer"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "integer"
+          },
+          "sql_only": {
+            "title": "Sql Only",
+            "type": "integer"
+          },
+          "stable_items": {
+            "title": "Stable Items",
+            "type": "integer"
+          },
+          "target_version": {
+            "const": "0.2.0",
+            "title": "Target Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_version",
+          "stable_items",
+          "aligned",
+          "managed_equivalent",
+          "partial",
+          "sql_only",
+          "deferred",
+          "missing_sdk"
+        ],
+        "title": "PgContextCompatibilityCapabilities",
+        "type": "object"
+      },
+      "PgContextScoredPoint": {
+        "additionalProperties": true,
+        "properties": {
+          "point_id": {
+            "title": "Point Id",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "point_id",
+          "source_key",
+          "score"
+        ],
+        "title": "PgContextScoredPoint",
+        "type": "object"
+      },
+      "PgContextScoredResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/PgContextScoredPoint"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "results"
+        ],
+        "title": "PgContextScoredResponse",
+        "type": "object"
+      },
+      "PgContextVectorMetadata": {
+        "additionalProperties": true,
+        "properties": {
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "dimensions": {
+            "maximum": 16000.0,
+            "minimum": 1.0,
+            "title": "Dimensions",
+            "type": "integer"
+          },
+          "hnsw_options": {
+            "additionalProperties": true,
+            "title": "Hnsw Options",
+            "type": "object"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "quantization_options": {
+            "additionalProperties": true,
+            "title": "Quantization Options",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          },
+          "table_schema": {
+            "title": "Table Schema",
+            "type": "string"
+          },
+          "vector_column": {
+            "title": "Vector Column",
+            "type": "string"
+          },
+          "vector_name": {
+            "title": "Vector Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collection_name",
+          "vector_name",
+          "table_schema",
+          "table_name",
+          "vector_column",
+          "dimensions",
+          "metric",
+          "hnsw_options",
+          "quantization_options",
+          "status"
+        ],
+        "title": "PgContextVectorMetadata",
+        "type": "object"
+      },
       "PgDumpImportRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5188,6 +6937,91 @@
           "format"
         ],
         "title": "PgDumpImportRequest",
+        "type": "object"
+      },
+      "PointBatchProgress": {
+        "additionalProperties": true,
+        "properties": {
+          "batch_number": {
+            "title": "Batch Number",
+            "type": "integer"
+          },
+          "deleted_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Count"
+          },
+          "inserted_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inserted Count"
+          },
+          "missing_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Count"
+          },
+          "processed_count": {
+            "title": "Processed Count",
+            "type": "integer"
+          },
+          "reactivated_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reactivated Count"
+          }
+        },
+        "required": [
+          "batch_number",
+          "processed_count"
+        ],
+        "title": "PointBatchProgress",
+        "type": "object"
+      },
+      "PointBatchResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "batches": {
+            "items": {
+              "$ref": "#/components/schemas/PointBatchProgress"
+            },
+            "title": "Batches",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "batches"
+        ],
+        "title": "PointBatchResponse",
         "type": "object"
       },
       "PointKeysRequest": {
@@ -5579,11 +7413,49 @@
       "ProjectCreateRequest": {
         "additionalProperties": false,
         "properties": {
+          "confirmations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncedProjectConfirmations"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_selection_generation": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Selection Generation"
+          },
           "name": {
             "maxLength": 80,
             "minLength": 1,
             "title": "Name",
             "type": "string"
+          },
+          "preflight_attempt_id": {
+            "anyOf": [
+              {
+                "pattern": "^pf[a-z0-9]{22}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preflight Attempt Id"
+          },
+          "project_type": {
+            "$ref": "#/components/schemas/ProjectType",
+            "default": "standard"
           }
         },
         "required": [
@@ -5616,6 +7488,83 @@
         "title": "ProjectPermissionCheck",
         "type": "object"
       },
+      "ProjectPreflightCancelRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_attempt_generation": {
+            "minimum": 0.0,
+            "title": "Expected Attempt Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_attempt_generation"
+        ],
+        "title": "ProjectPreflightCancelRequest",
+        "type": "object"
+      },
+      "ProjectPreflightCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/SourceConnectionRequest"
+          },
+          "project_type": {
+            "const": "postgres_sync",
+            "title": "Project Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_type",
+          "connection"
+        ],
+        "title": "ProjectPreflightCreateRequest",
+        "type": "object"
+      },
+      "ProjectPreflightReplaceConnectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/SourceConnectionRequest"
+          },
+          "expected_attempt_generation": {
+            "minimum": 0.0,
+            "title": "Expected Attempt Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_attempt_generation",
+          "connection"
+        ],
+        "title": "ProjectPreflightReplaceConnectionRequest",
+        "type": "object"
+      },
+      "ProjectPreflightSelectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_selection_generation": {
+            "minimum": 0.0,
+            "title": "Expected Selection Generation",
+            "type": "integer"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/SyncTableReference"
+            },
+            "minItems": 1,
+            "title": "Tables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "expected_selection_generation",
+          "tables"
+        ],
+        "title": "ProjectPreflightSelectionRequest",
+        "type": "object"
+      },
       "ProjectRenameRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5646,6 +7595,417 @@
           "upgrade_path_id"
         ],
         "title": "ProjectRuntimeUpgradeCreateRequest",
+        "type": "object"
+      },
+      "ProjectType": {
+        "description": "Create-request discriminator; it is never persisted as authorization state.",
+        "enum": [
+          "standard",
+          "postgres_sync"
+        ],
+        "title": "ProjectType",
+        "type": "string"
+      },
+      "QueryCohortStatsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/QueryCohortStatsRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "QueryCohortStatsResponse",
+        "type": "object"
+      },
+      "QueryCohortStatsRow": {
+        "additionalProperties": true,
+        "properties": {
+          "avg_latency_ms": {
+            "title": "Avg Latency Ms",
+            "type": "number"
+          },
+          "avg_recall_achieved": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Recall Achieved"
+          },
+          "avg_recall_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Recall Threshold"
+          },
+          "cohort": {
+            "title": "Cohort",
+            "type": "string"
+          },
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "latency_bucket": {
+            "title": "Latency Bucket",
+            "type": "string"
+          },
+          "lifecycle_state": {
+            "title": "Lifecycle State",
+            "type": "string"
+          },
+          "query_count": {
+            "title": "Query Count",
+            "type": "integer"
+          },
+          "query_kind": {
+            "title": "Query Kind",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_candidates": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Candidates"
+          },
+          "total_results": {
+            "title": "Total Results",
+            "type": "integer"
+          },
+          "total_rows_pruned": {
+            "title": "Total Rows Pruned",
+            "type": "integer"
+          },
+          "total_rows_rechecked": {
+            "title": "Total Rows Rechecked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "collection_name",
+          "cohort",
+          "query_kind",
+          "query_count",
+          "total_results",
+          "total_candidates",
+          "total_rows_rechecked",
+          "total_rows_pruned",
+          "avg_recall_threshold",
+          "avg_recall_achieved",
+          "latency_bucket",
+          "lifecycle_state",
+          "avg_latency_ms",
+          "status"
+        ],
+        "title": "QueryCohortStatsRow",
+        "type": "object"
+      },
+      "QueryExecuteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ContextQueryPlan"
+          }
+        },
+        "required": [
+          "collection",
+          "plan"
+        ],
+        "title": "QueryExecuteRequest",
+        "type": "object"
+      },
+      "QueryExecutionResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "collection": {
+            "$ref": "#/components/schemas/RankedCollection"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/QueryExecutionResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "collection",
+          "results"
+        ],
+        "title": "QueryExecutionResponse",
+        "type": "object"
+      },
+      "QueryExecutionResult": {
+        "additionalProperties": true,
+        "properties": {
+          "point_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Point Id",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "point_id",
+          "source_key",
+          "score"
+        ],
+        "title": "QueryExecutionResult",
+        "type": "object"
+      },
+      "QueryExecutionStatsResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/QueryExecutionStatsRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "QueryExecutionStatsResponse",
+        "type": "object"
+      },
+      "QueryExecutionStatsRow": {
+        "additionalProperties": true,
+        "properties": {
+          "avg_latency_ms": {
+            "title": "Avg Latency Ms",
+            "type": "number"
+          },
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "completion": {
+            "title": "Completion",
+            "type": "string"
+          },
+          "latency_bucket": {
+            "title": "Latency Bucket",
+            "type": "string"
+          },
+          "lifecycle_state": {
+            "title": "Lifecycle State",
+            "type": "string"
+          },
+          "query_count": {
+            "title": "Query Count",
+            "type": "integer"
+          },
+          "query_kind": {
+            "title": "Query Kind",
+            "type": "string"
+          },
+          "strategy": {
+            "title": "Strategy",
+            "type": "string"
+          },
+          "total_candidates": {
+            "title": "Total Candidates",
+            "type": "integer"
+          },
+          "total_expansions": {
+            "title": "Total Expansions",
+            "type": "integer"
+          },
+          "total_filter_candidates": {
+            "title": "Total Filter Candidates",
+            "type": "integer"
+          },
+          "total_rechecks": {
+            "title": "Total Rechecks",
+            "type": "integer"
+          },
+          "total_stages": {
+            "title": "Total Stages",
+            "type": "integer"
+          },
+          "total_visits": {
+            "title": "Total Visits",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "collection_name",
+          "query_kind",
+          "strategy",
+          "query_count",
+          "total_visits",
+          "total_filter_candidates",
+          "total_candidates",
+          "total_rechecks",
+          "total_stages",
+          "total_expansions",
+          "completion",
+          "latency_bucket",
+          "lifecycle_state",
+          "avg_latency_ms"
+        ],
+        "title": "QueryExecutionStatsRow",
+        "type": "object"
+      },
+      "QueryExplainRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "text_column": {
+            "title": "Text Column",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collection",
+          "text_column"
+        ],
+        "title": "QueryExplainRequest",
+        "type": "object"
+      },
+      "QueryExplainResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "collection": {
+            "$ref": "#/components/schemas/RankedCollection"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/QueryExplainRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "collection",
+          "rows"
+        ],
+        "title": "QueryExplainResponse",
+        "type": "object"
+      },
+      "QueryExplainRow": {
+        "additionalProperties": true,
+        "properties": {
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "candidate_budget": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Budget"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "estimated_candidates": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Candidates"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy": {
+            "title": "Strategy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage",
+          "detail",
+          "branch",
+          "strategy",
+          "status",
+          "estimated_candidates",
+          "candidate_budget"
+        ],
+        "title": "QueryExplainRow",
         "type": "object"
       },
       "RankFusionSearchRequest": {
@@ -5833,6 +8193,103 @@
         "title": "RankedResponse",
         "type": "object"
       },
+      "RawVectorSearchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 10,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "metric": {
+            "enum": [
+              "l2",
+              "inner_product",
+              "cosine",
+              "l1"
+            ],
+            "title": "Metric",
+            "type": "string"
+          },
+          "point_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Point Ids",
+            "type": "array"
+          },
+          "query": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Query",
+            "type": "array"
+          },
+          "vectors": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "minItems": 1,
+            "title": "Vectors",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query",
+          "point_ids",
+          "vectors",
+          "metric"
+        ],
+        "title": "RawVectorSearchRequest",
+        "type": "object"
+      },
+      "RawVectorSearchResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/RawVectorSearchResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "results"
+        ],
+        "title": "RawVectorSearchResponse",
+        "type": "object"
+      },
+      "RawVectorSearchResult": {
+        "additionalProperties": true,
+        "properties": {
+          "point_id": {
+            "title": "Point Id",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "point_id",
+          "score"
+        ],
+        "title": "RawVectorSearchResult",
+        "type": "object"
+      },
       "RecallCheckRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5952,6 +8409,75 @@
         "title": "RecallCheckResponse",
         "type": "object"
       },
+      "RecommendRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "limit": {
+            "default": 10,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "negative_point_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Negative Point Ids",
+            "type": "array"
+          },
+          "negative_vectors": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Negative Vectors",
+            "type": "array"
+          },
+          "positive_point_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Point Ids"
+          },
+          "positive_vectors": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Vectors"
+          }
+        },
+        "required": [
+          "collection"
+        ],
+        "title": "RecommendRequest",
+        "type": "object"
+      },
       "RecommendedAction": {
         "additionalProperties": true,
         "properties": {
@@ -5968,6 +8494,52 @@
           "message"
         ],
         "title": "RecommendedAction",
+        "type": "object"
+      },
+      "RegisterModelVersionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "dimensions": {
+            "maximum": 16000.0,
+            "minimum": 1.0,
+            "title": "Dimensions",
+            "type": "integer"
+          },
+          "metric": {
+            "enum": [
+              "l2",
+              "inner_product",
+              "cosine",
+              "l1"
+            ],
+            "title": "Metric",
+            "type": "string"
+          },
+          "model_name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model Name",
+            "type": "string"
+          },
+          "model_version": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collection",
+          "model_name",
+          "model_version",
+          "dimensions",
+          "metric"
+        ],
+        "title": "RegisterModelVersionRequest",
         "type": "object"
       },
       "Relationship": {
@@ -6084,6 +8656,7 @@
             "enum": [
               "graph:read",
               "graph:manage",
+              "rows:read",
               "rows:write"
             ],
             "title": "Scope",
@@ -6263,6 +8836,122 @@
         "title": "SelectOrganizationInvitationRequest",
         "type": "object"
       },
+      "SetPayloadRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "title": "Collection",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "minProperties": 1,
+            "title": "Payload",
+            "type": "object"
+          },
+          "source_keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Source Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_keys",
+          "collection",
+          "payload"
+        ],
+        "title": "SetPayloadRequest",
+        "type": "object"
+      },
+      "SourceConnectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "database": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "title": "SourceConnectionRequest",
+        "type": "object"
+      },
       "SqlImportRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6308,6 +8997,269 @@
           "sql"
         ],
         "title": "SqlQueryRequest",
+        "type": "object"
+      },
+      "SyncCredentialRotationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/SourceConnectionRequest"
+          },
+          "expected_configuration_generation": {
+            "minimum": 0.0,
+            "title": "Expected Configuration Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_configuration_generation",
+          "connection"
+        ],
+        "title": "SyncCredentialRotationRequest",
+        "type": "object"
+      },
+      "SyncLifecycleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_configuration_generation": {
+            "minimum": 0.0,
+            "title": "Expected Configuration Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_configuration_generation"
+        ],
+        "title": "SyncLifecycleRequest",
+        "type": "object"
+      },
+      "SyncResnapshotRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm_data_reset": {
+            "title": "Confirm Data Reset",
+            "type": "boolean"
+          },
+          "expected_configuration_generation": {
+            "minimum": 0.0,
+            "title": "Expected Configuration Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_configuration_generation",
+          "confirm_data_reset"
+        ],
+        "title": "SyncResnapshotRequest",
+        "type": "object"
+      },
+      "SyncTableReference": {
+        "additionalProperties": false,
+        "properties": {
+          "included_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Included Columns"
+          },
+          "schema_name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Schema Name",
+            "type": "string"
+          },
+          "sync_key_index_name": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Key Index Name"
+          },
+          "table_name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Table Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_name",
+          "table_name"
+        ],
+        "title": "SyncTableReference",
+        "type": "object"
+      },
+      "SyncTableSelectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_configuration_generation": {
+            "minimum": 1.0,
+            "title": "Expected Configuration Generation",
+            "type": "integer"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/SyncTableReference"
+            },
+            "minItems": 1,
+            "title": "Tables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "expected_configuration_generation",
+          "tables"
+        ],
+        "title": "SyncTableSelectionRequest",
+        "type": "object"
+      },
+      "SyncedProjectConfirmations": {
+        "additionalProperties": false,
+        "properties": {
+          "fixed_table_selection": {
+            "title": "Fixed Table Selection",
+            "type": "boolean"
+          },
+          "managed_replication_resources": {
+            "title": "Managed Replication Resources",
+            "type": "boolean"
+          },
+          "mutation_restrictions": {
+            "title": "Mutation Restrictions",
+            "type": "boolean"
+          },
+          "no_database_credentials": {
+            "title": "No Database Credentials",
+            "type": "boolean"
+          },
+          "source_authority": {
+            "title": "Source Authority",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source_authority",
+          "mutation_restrictions",
+          "fixed_table_selection",
+          "managed_replication_resources",
+          "no_database_credentials"
+        ],
+        "title": "SyncedProjectConfirmations",
+        "type": "object"
+      },
+      "TelemetryResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TelemetryRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "TelemetryResponse",
+        "type": "object"
+      },
+      "TelemetryRow": {
+        "additionalProperties": true,
+        "properties": {
+          "active_points": {
+            "title": "Active Points",
+            "type": "integer"
+          },
+          "collection_name": {
+            "title": "Collection Name",
+            "type": "string"
+          },
+          "deleted_points": {
+            "title": "Deleted Points",
+            "type": "integer"
+          },
+          "filter_fields": {
+            "title": "Filter Fields",
+            "type": "integer"
+          },
+          "has_source_table": {
+            "title": "Has Source Table",
+            "type": "boolean"
+          },
+          "hnsw_indexes": {
+            "title": "Hnsw Indexes",
+            "type": "integer"
+          },
+          "registered_vectors": {
+            "title": "Registered Vectors",
+            "type": "integer"
+          },
+          "source_table_exists": {
+            "title": "Source Table Exists",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "table_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Name"
+          },
+          "table_schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Schema"
+          }
+        },
+        "required": [
+          "collection_name",
+          "table_schema",
+          "table_name",
+          "has_source_table",
+          "source_table_exists",
+          "registered_vectors",
+          "active_points",
+          "deleted_points",
+          "filter_fields",
+          "hnsw_indexes",
+          "status"
+        ],
+        "title": "TelemetryRow",
         "type": "object"
       },
       "TextConfigurationCreateRequest": {
@@ -6702,6 +9654,108 @@
         "title": "TextSearchRequest",
         "type": "object"
       },
+      "UpdateEmbeddingMigrationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "processed_points": {
+            "minimum": 0.0,
+            "title": "Processed Points",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processed_points",
+          "status"
+        ],
+        "title": "UpdateEmbeddingMigrationRequest",
+        "type": "object"
+      },
+      "VacuumAdviceResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/VacuumAdviceRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "rows"
+        ],
+        "title": "VacuumAdviceResponse",
+        "type": "object"
+      },
+      "VacuumAdviceRow": {
+        "additionalProperties": true,
+        "properties": {
+          "access_method": {
+            "title": "Access Method",
+            "type": "string"
+          },
+          "dead_table_tuples": {
+            "title": "Dead Table Tuples",
+            "type": "integer"
+          },
+          "estimated_index_tuples": {
+            "title": "Estimated Index Tuples",
+            "type": "integer"
+          },
+          "index_name": {
+            "title": "Index Name",
+            "type": "string"
+          },
+          "index_pages": {
+            "title": "Index Pages",
+            "type": "integer"
+          },
+          "index_schema": {
+            "title": "Index Schema",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "table_name": {
+            "title": "Table Name",
+            "type": "string"
+          },
+          "table_schema": {
+            "title": "Table Schema",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index_schema",
+          "index_name",
+          "table_schema",
+          "table_name",
+          "access_method",
+          "estimated_index_tuples",
+          "index_pages",
+          "dead_table_tuples",
+          "status"
+        ],
+        "title": "VacuumAdviceRow",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -6930,6 +9984,56 @@
           }
         },
         "title": "VectorConfigurationPatchRequest",
+        "type": "object"
+      },
+      "VectorConfigureRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "hnsw_options": {
+            "additionalProperties": true,
+            "title": "Hnsw Options",
+            "type": "object"
+          },
+          "quantization_options": {
+            "additionalProperties": true,
+            "title": "Quantization Options",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "building",
+              "disabled",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hnsw_options",
+          "quantization_options",
+          "status"
+        ],
+        "title": "VectorConfigureRequest",
+        "type": "object"
+      },
+      "VectorConfigureResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "vector": {
+            "$ref": "#/components/schemas/PgContextVectorMetadata"
+          }
+        },
+        "required": [
+          "request_id",
+          "vector"
+        ],
+        "title": "VectorConfigureResponse",
         "type": "object"
       },
       "VectorFirstSearchRequest": {
@@ -8631,6 +11735,378 @@
         "summary": "Update Member Role"
       }
     },
+    "/v1/project-creation-options": {
+      "get": {
+        "operationId": "get_project_creation_options_v1_project_creation_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Project Creation Options V1 Project Creation Options Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Project Creation Options"
+      }
+    },
+    "/v1/project-preflights": {
+      "post": {
+        "operationId": "create_project_preflight_v1_project_preflights_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPreflightCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Project Preflight V1 Project Preflights Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Project Preflight"
+      }
+    },
+    "/v1/project-preflights/{attempt_id}": {
+      "delete": {
+        "operationId": "cancel_project_preflight_v1_project_preflights__attempt_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPreflightCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cancel Project Preflight V1 Project Preflights  Attempt Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Project Preflight"
+      },
+      "get": {
+        "operationId": "get_project_preflight_v1_project_preflights__attempt_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Project Preflight V1 Project Preflights  Attempt Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project Preflight"
+      }
+    },
+    "/v1/project-preflights/{attempt_id}/connection": {
+      "put": {
+        "operationId": "replace_project_preflight_connection_v1_project_preflights__attempt_id__connection_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPreflightReplaceConnectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Replace Project Preflight Connection V1 Project Preflights  Attempt Id  Connection Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Project Preflight Connection"
+      }
+    },
+    "/v1/project-preflights/{attempt_id}/selection": {
+      "put": {
+        "operationId": "update_project_preflight_selection_v1_project_preflights__attempt_id__selection_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPreflightSelectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Project Preflight Selection V1 Project Preflights  Attempt Id  Selection Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Project Preflight Selection"
+      }
+    },
+    "/v1/project-preflights/{attempt_id}/tables": {
+      "get": {
+        "operationId": "list_project_preflight_tables_v1_project_preflights__attempt_id__tables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Project Preflight Tables V1 Project Preflights  Attempt Id  Tables Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Project Preflight Tables"
+      }
+    },
     "/v1/projects": {
       "get": {
         "operationId": "list_projects_v1_projects_get",
@@ -8652,6 +12128,25 @@
       },
       "post": {
         "operationId": "create_project_v1_projects_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -9081,6 +12576,177 @@
         "summary": "Reveal Password"
       }
     },
+    "/v1/projects/{project_id}/context/aliases": {
+      "get": {
+        "operationId": "context_list_collection_aliases",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionAliasListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context List Collection Aliases",
+        "tags": [
+          "context"
+        ]
+      },
+      "post": {
+        "operationId": "context_create_collection_alias",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionAliasRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionAliasResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Create Collection Alias",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/aliases/{alias_name}": {
+      "delete": {
+        "operationId": "context_drop_collection_alias",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionAliasDropResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Drop Collection Alias",
+        "tags": [
+          "context"
+        ]
+      }
+    },
     "/v1/projects/{project_id}/context/capabilities": {
       "get": {
         "operationId": "context_capabilities",
@@ -9236,6 +12902,998 @@
           }
         ],
         "summary": "Context Proxy Context Create Collection",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/embedding-migrations": {
+      "get": {
+        "operationId": "context_embedding_migrations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingMigrationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Embedding Migrations",
+        "tags": [
+          "context"
+        ]
+      },
+      "post": {
+        "operationId": "context_create_embedding_migration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmbeddingMigrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingMigrationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Create Embedding Migration",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/embedding-migrations/{migration_id}": {
+      "patch": {
+        "operationId": "context_update_embedding_migration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmbeddingMigrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingMigrationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Update Embedding Migration",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/index-advisor": {
+      "get": {
+        "operationId": "context_index_advisor",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexAdvisorResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Index Advisor",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/indexes/{index_name}/diagnostics": {
+      "get": {
+        "operationId": "context_index_diagnostics",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexDiagnosticsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Index Diagnostics",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/indexes/{index_name}/memory-estimate": {
+      "get": {
+        "operationId": "context_estimate_index_memory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexMemoryEstimateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Estimate Index Memory",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/indexes/{index_name}/status": {
+      "get": {
+        "operationId": "context_index_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Index Status",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/indexes/{index_name}/vacuum-advice": {
+      "get": {
+        "operationId": "context_vacuum_advice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacuumAdviceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Vacuum Advice",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/info": {
+      "get": {
+        "operationId": "context_collection_info",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PgContextCollectionInfoResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Collection Info",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/limits": {
+      "get": {
+        "operationId": "context_collection_limits",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionLimitsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Collection Limits",
+        "tags": [
+          "context"
+        ]
+      },
+      "patch": {
+        "operationId": "context_configure_collection_limits",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionLimitsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionLimitsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Configure Collection Limits",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/model-versions": {
+      "get": {
+        "operationId": "context_model_versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Model Versions",
+        "tags": [
+          "context"
+        ]
+      },
+      "post": {
+        "operationId": "context_register_model_version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterModelVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelVersionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Register Model Version",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/optimization-status": {
+      "get": {
+        "operationId": "context_optimization_status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizationStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Optimization Status",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/query-cohort-stats": {
+      "get": {
+        "operationId": "context_query_cohort_stats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryCohortStatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Query Cohort Stats",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/query-execution-stats": {
+      "get": {
+        "operationId": "context_query_execution_stats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryExecutionStatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Query Execution Stats",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/telemetry": {
+      "get": {
+        "operationId": "context_telemetry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Telemetry",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/vectors": {
+      "get": {
+        "operationId": "context_collection_vectors",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionVectorsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Collection Vectors",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/collections/by-name/{collection_name}/vectors/{vector_name}": {
+      "patch": {
+        "operationId": "context_configure_vector",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VectorConfigureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VectorConfigureResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Configure Vector",
         "tags": [
           "context"
         ]
@@ -10474,6 +15132,63 @@
         ]
       }
     },
+    "/v1/projects/{project_id}/context/explore": {
+      "post": {
+        "operationId": "context_explore",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextPointDiscoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PgContextScoredResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Explore",
+        "tags": [
+          "context"
+        ]
+      }
+    },
     "/v1/projects/{project_id}/context/facets": {
       "post": {
         "operationId": "context_facets",
@@ -11460,6 +16175,414 @@
         ]
       }
     },
+    "/v1/projects/{project_id}/context/points/backfill": {
+      "post": {
+        "operationId": "context_backfill_points",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillPointsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PointBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Backfill Points",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/points/bulk-delete": {
+      "post": {
+        "operationId": "context_bulk_delete_points",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPointKeysRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PointBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Bulk Delete Points",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/points/bulk-upsert": {
+      "post": {
+        "operationId": "context_bulk_upsert_points",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPointKeysRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PointBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Bulk Upsert Points",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/points/payload": {
+      "put": {
+        "operationId": "context_set_payload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPayloadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayloadMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Set Payload",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/points/payload/clear": {
+      "post": {
+        "operationId": "context_clear_payload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearPayloadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayloadMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Clear Payload",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/points/payload/delete": {
+      "post": {
+        "operationId": "context_delete_payload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletePayloadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayloadMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Delete Payload",
+        "tags": [
+          "context"
+        ]
+      }
+    },
     "/v1/projects/{project_id}/context/preflight": {
       "post": {
         "operationId": "context_preflight",
@@ -11512,6 +16635,120 @@
           }
         ],
         "summary": "Context Proxy Context Preflight",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/query/execute": {
+      "post": {
+        "operationId": "context_execute_query",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryExecutionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Execute Query",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/query/explain": {
+      "post": {
+        "operationId": "context_explain_query",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryExplainResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Explain Query",
         "tags": [
           "context"
         ]
@@ -11574,6 +16811,63 @@
         ]
       }
     },
+    "/v1/projects/{project_id}/context/recommend": {
+      "post": {
+        "operationId": "context_recommend",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PgContextScoredResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Recommend",
+        "tags": [
+          "context"
+        ]
+      }
+    },
     "/v1/projects/{project_id}/context/search": {
       "post": {
         "operationId": "context_search",
@@ -11626,6 +16920,177 @@
           }
         ],
         "summary": "Context Proxy Context Search",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/search/candidates": {
+      "post": {
+        "operationId": "context_candidate_search",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PgContextScoredResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Candidate Search",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/search/discover": {
+      "post": {
+        "operationId": "context_discover_points",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextPointDiscoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PgContextScoredResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Discover Points",
+        "tags": [
+          "context"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/context/search/raw": {
+      "post": {
+        "operationId": "context_raw_vector_search",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RawVectorSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RawVectorSearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Context Proxy Context Raw Vector Search",
         "tags": [
           "context"
         ]
@@ -13591,6 +19056,522 @@
         "summary": "Get Project Status"
       }
     },
+    "/v1/projects/{project_id}/sync/credential-rotation": {
+      "post": {
+        "operationId": "rotate_sync_credential_v1_projects__project_id__sync_credential_rotation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncCredentialRotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rotate Sync Credential V1 Projects  Project Id  Sync Credential Rotation Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Sync Credential"
+      }
+    },
+    "/v1/projects/{project_id}/sync/pause": {
+      "post": {
+        "operationId": "pause_sync_v1_projects__project_id__sync_pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Pause Sync V1 Projects  Project Id  Sync Pause Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Sync"
+      }
+    },
+    "/v1/projects/{project_id}/sync/resnapshot": {
+      "post": {
+        "operationId": "resnapshot_sync_v1_projects__project_id__sync_resnapshot_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncResnapshotRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resnapshot Sync V1 Projects  Project Id  Sync Resnapshot Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resnapshot Sync"
+      }
+    },
+    "/v1/projects/{project_id}/sync/resume": {
+      "post": {
+        "operationId": "resume_sync_v1_projects__project_id__sync_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resume Sync V1 Projects  Project Id  Sync Resume Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Sync"
+      }
+    },
+    "/v1/projects/{project_id}/sync/retry": {
+      "post": {
+        "operationId": "retry_sync_v1_projects__project_id__sync_retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Retry Sync V1 Projects  Project Id  Sync Retry Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Sync"
+      }
+    },
+    "/v1/projects/{project_id}/sync/source-tables": {
+      "get": {
+        "operationId": "list_synced_project_source_tables_v1_projects__project_id__sync_source_tables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Synced Project Source Tables V1 Projects  Project Id  Sync Source Tables Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Synced Project Source Tables"
+      }
+    },
+    "/v1/projects/{project_id}/sync/tables": {
+      "get": {
+        "operationId": "list_synced_project_tables_v1_projects__project_id__sync_tables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Synced Project Tables V1 Projects  Project Id  Sync Tables Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Synced Project Tables"
+      },
+      "put": {
+        "operationId": "reconfigure_synced_project_tables_v1_projects__project_id__sync_tables_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[\\x20-\\x7e]+$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncTableSelectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reconfigure Synced Project Tables V1 Projects  Project Id  Sync Tables Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reconfigure Synced Project Tables"
+      }
+    },
     "/v1/projects/{project_id}/tables": {
       "get": {
         "operationId": "list_tables_v1_projects__project_id__tables_get",
@@ -14165,6 +20146,47 @@
         "summary": "Text Tsvector Search"
       }
     },
+    "/v1/projects/{project_id}/vector/compatibility": {
+      "get": {
+        "operationId": "vector_compatibility",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Vector Compatibility",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Runtime Setup Proxy Get Vector Compatibility"
+      }
+    },
     "/v1/projects/{project_id}/vector/configurations": {
       "get": {
         "operationId": "list_vector_configurations_v1_projects__project_id__vector_configurations_get",
@@ -14410,6 +20432,65 @@
           }
         },
         "summary": "Update Vector Configuration"
+      }
+    },
+    "/v1/projects/{project_id}/vector/configurations/{config_id}/compatibility-engine/{target_engine}": {
+      "post": {
+        "operationId": "vector_compatibility_engine",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "target_engine",
+            "required": true,
+            "schema": {
+              "title": "Target Engine",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Vector Compatibility Engine",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Runtime Setup Proxy Post Vector Configurations Config Id Compatibility-Engine Target Engine"
       }
     },
     "/v1/projects/{project_id}/vector/configurations/{config_id}/reindex": {

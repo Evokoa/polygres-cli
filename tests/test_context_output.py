@@ -96,17 +96,33 @@ def _render(function: Callable[..., None], **kwargs: Any) -> HumanRenderer:
                         "name": "docs",
                         "schema_name": "public",
                         "table_name": "docs",
-                        "vector_column": "embedding",
-                        "dimensions": 3,
-                        "metric": "cosine",
-                        "index_status": "ready",
+                        "default_vector_name": "embedding",
+                        "vectors": [
+                            {
+                                "name": "embedding",
+                                "column_name": "embedding",
+                                "dimensions": 3,
+                                "metric": "cosine",
+                                "index_status": "ready",
+                                "is_default": True,
+                            }
+                        ],
                         "mapped_point_count": 2,
                         "is_default": True,
                         "status": "ready",
                     }
                 ]
             },
-            ["ID", "NAME", "SOURCE", "public.docs", "POINTS", "DEFAULT"],
+            [
+                "ID",
+                "NAME",
+                "SOURCE",
+                "public.docs",
+                "embedding",
+                "cosine",
+                "POINTS",
+                "DEFAULT",
+            ],
         ),
         (
             _render(context_collection_get_human),
@@ -119,14 +135,35 @@ def _render(function: Callable[..., None], **kwargs: Any) -> HumanRenderer:
                     "schema_name": "public",
                     "table_name": "docs",
                     "source_key_column": "id",
-                    "vector_column": "embedding",
-                    "dimensions": 3,
-                    "metric": "cosine",
+                    "default_vector_name": "embedding",
+                    "vectors": [
+                        {
+                            "name": "embedding",
+                            "column_name": "embedding",
+                            "dimensions": 3,
+                            "metric": "cosine",
+                            "index_name": "docs_embedding_hnsw",
+                            "index_status": "ready",
+                            "is_default": True,
+                        }
+                    ],
                     "result_columns": ["title"],
                     "filter_columns": ["tenant_id"],
                 }
             },
-            ["Name", "docs", "Source key", "Result columns", "tenant_id"],
+            [
+                "Name",
+                "docs",
+                "Source key",
+                "Vector",
+                "embedding",
+                "Dimensions",
+                "3",
+                "Index status",
+                "ready",
+                "Result columns",
+                "tenant_id",
+            ],
         ),
         (
             _render(context_collection_status_human),

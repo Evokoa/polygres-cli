@@ -53,6 +53,25 @@ class UsageError(CliError):
         super().__init__(code=code, message=message, exit_code=USAGE)
 
 
+def catalog_cli_error(code: str, *, request_id: str | None = None) -> CliError:
+    """Build a local CLI error from the shared public error catalog.
+
+    Client-side project-mode gates use this rather than duplicating a message or
+    exit-code mapping. The API remains authoritative, but local gates must
+    render the identical stable public contract before they attempt a forbidden
+    connection or legacy retrieval request.
+    """
+    descriptor = ERROR_CATALOG[code]
+    return CliError(
+        code=descriptor.code,
+        message=descriptor.message,
+        exit_code=descriptor.cli_exit_code,
+        request_id=request_id,
+        status_code=descriptor.http_status,
+        server_code_declared=True,
+    )
+
+
 def is_maintenance_error_payload(payload: dict[str, Any] | None) -> bool:
     error = (payload or {}).get("error")
     return isinstance(error, dict) and error.get("code") in {

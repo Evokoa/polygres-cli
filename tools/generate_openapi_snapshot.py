@@ -74,7 +74,6 @@ def _configure_deterministic_schema_environment() -> None:
         "ENVIRONMENT": "local",
         "LOCAL_CONTROL_PLANE": "memory",
         "LOCAL_RUNTIME_MODE": "in_memory",
-        "RUNTIME_SETUP_PROXY_ENABLED": "false",
     }
     os.environ.update(values)
 

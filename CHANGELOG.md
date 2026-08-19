@@ -4,6 +4,23 @@ All notable changes to `polygres-cli` are documented in this file.
 
 ## Unreleased
 
+## 0.4.0 - 2026-08-19
+
+### Added
+
+- Added one-step `polygres projects create sync <name>` orchestration for source
+  inspection, table selection, admission, and project provisioning without
+  exposing internal attempt IDs.
+- Sync source credentials are accepted only through named environment variables
+  or hidden interactive prompts; mutations expose resumable idempotency keys.
+
+### Changed
+
+- Synchronized PostgreSQL projects now reject database connection CLI surfaces
+  with the stable `SYNCED_PROJECT_SURFACE_UNAVAILABLE` permission contract
+  before any database client is started. Public readiness and vector commands
+  remain available.
+
 ## 0.3.0 - 2026-08-14
 
 ### Added

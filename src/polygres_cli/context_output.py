@@ -153,9 +153,31 @@ def context_preflight_human(
     _request_id(payload, verbose)
 
 
+def _default_collection_vector(collection: dict[str, Any]) -> dict[str, Any]:
+    """Return the nested default vector with legacy flat-field fallback."""
+
+    vectors = _list(collection.get("vectors"))
+    default_name = collection.get("default_vector_name")
+    for vector in vectors:
+        if vector.get("is_default") or (
+            default_name is not None and vector.get("name") == default_name
+        ):
+            return vector
+    if vectors:
+        return vectors[0]
+    return {
+        "column_name": collection.get("vector_column"),
+        "dimensions": collection.get("dimensions"),
+        "metric": collection.get("metric"),
+        "index_name": collection.get("index_name"),
+        "index_status": collection.get("index_status"),
+    }
+
+
 def context_collections_list_human(payload: dict[str, Any], *, verbose: bool) -> None:
     rows = []
     for collection in _list(payload.get("collections")):
+        vector = _default_collection_vector(collection)
         rows.append(
             {
                 "ID": _display(collection.get("id")),
@@ -164,10 +186,10 @@ def context_collections_list_human(payload: dict[str, Any], *, verbose: bool) ->
                     f"{_display(collection.get('schema_name'))}."
                     f"{_display(collection.get('table_name'))}"
                 ),
-                "VECTOR": _display(collection.get("vector_column")),
-                "DIMENSIONS": _display(collection.get("dimensions")),
-                "METRIC": _display(collection.get("metric")),
-                "INDEX": _display(collection.get("index_status")),
+                "VECTOR": _display(vector.get("column_name")),
+                "DIMENSIONS": _display(vector.get("dimensions")),
+                "METRIC": _display(vector.get("metric")),
+                "INDEX": _display(vector.get("index_status")),
                 "POINTS": _display(collection.get("mapped_point_count")),
                 "DEFAULT": "yes" if collection.get("is_default") else "no",
                 "STATUS": _display(collection.get("status")),
@@ -194,6 +216,7 @@ def context_collections_list_human(payload: dict[str, Any], *, verbose: bool) ->
 
 def context_collection_get_human(payload: dict[str, Any], *, verbose: bool) -> None:
     collection = _dict(payload.get("collection"))
+    vector = _default_collection_vector(collection)
     print_kv(
         [
             ("ID", _display(collection.get("id"))),
@@ -206,14 +229,14 @@ def context_collection_get_human(payload: dict[str, Any], *, verbose: bool) -> N
                 f"{_display(collection.get('table_name'))}",
             ),
             ("Source key", _display(collection.get("source_key_column"))),
-            ("Vector", _display(collection.get("vector_column"))),
-            ("Dimensions", _display(collection.get("dimensions"))),
-            ("Metric", _display(collection.get("metric"))),
+            ("Vector", _display(vector.get("column_name"))),
+            ("Dimensions", _display(vector.get("dimensions"))),
+            ("Metric", _display(vector.get("metric"))),
             ("Text column", _display(collection.get("text_column"))),
             ("Result columns", _join(collection.get("result_columns"))),
             ("Filter columns", _join(collection.get("filter_columns"))),
-            ("Index", _display(collection.get("index_name"))),
-            ("Index status", _display(collection.get("index_status"))),
+            ("Index", _display(vector.get("index_name"))),
+            ("Index status", _display(vector.get("index_status"))),
             (
                 "Point reconciliation",
                 _display(collection.get("point_reconciliation_status")),

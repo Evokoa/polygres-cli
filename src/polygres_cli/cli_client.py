@@ -151,6 +151,96 @@ class CliControlPlaneClient:
     ) -> dict[str, Any]:
         return self._post("/projects", {"name": name}, timeout=request_timeout, deadline=deadline)
 
+    def project_creation_options(self) -> dict[str, Any]:
+        return self._get("/project-creation-options")
+
+    def create_project_preflight(
+        self,
+        connection: dict[str, Any],
+        *,
+        idempotency_key: str,
+        request_timeout: float | None = None,
+        deadline: float | None = None,
+    ) -> dict[str, Any]:
+        return self._post(
+            "/project-preflights",
+            {"project_type": "postgres_sync", "connection": connection},
+            timeout=request_timeout,
+            deadline=deadline,
+            idempotency_key=idempotency_key,
+        )
+
+    def get_project_preflight(
+        self, attempt_id: str, *, deadline: float | None = None
+    ) -> dict[str, Any]:
+        return self._get(
+            f"/project-preflights/{quote(attempt_id, safe='')}",
+            deadline=deadline,
+        )
+
+    def list_project_preflight_tables(
+        self,
+        attempt_id: str,
+        *,
+        cursor: str | None = None,
+        limit: int = 100,
+        deadline: float | None = None,
+    ) -> dict[str, Any]:
+        query: dict[str, str | int] = {"limit": limit}
+        if cursor is not None:
+            query["cursor"] = cursor
+        return self._get(
+            f"/project-preflights/{quote(attempt_id, safe='')}/tables?{urlencode(query)}",
+            deadline=deadline,
+        )
+
+    def update_project_preflight_selection(
+        self,
+        attempt_id: str,
+        *,
+        expected_selection_generation: int,
+        tables: list[dict[str, Any]],
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        return self._put(
+            f"/project-preflights/{quote(attempt_id, safe='')}/selection",
+            {
+                "expected_selection_generation": expected_selection_generation,
+                "tables": tables,
+            },
+            idempotency_key=idempotency_key,
+        )
+
+    def create_synced_project(
+        self,
+        name: str,
+        *,
+        preflight_attempt_id: str,
+        expected_selection_generation: int,
+        idempotency_key: str,
+        request_timeout: float | None = None,
+        deadline: float | None = None,
+    ) -> dict[str, Any]:
+        return self._post(
+            "/projects",
+            {
+                "name": name,
+                "project_type": "postgres_sync",
+                "preflight_attempt_id": preflight_attempt_id,
+                "expected_selection_generation": expected_selection_generation,
+                "confirmations": {
+                    "source_authority": True,
+                    "mutation_restrictions": True,
+                    "fixed_table_selection": True,
+                    "managed_replication_resources": True,
+                    "no_database_credentials": True,
+                },
+            },
+            timeout=request_timeout,
+            deadline=deadline,
+            idempotency_key=idempotency_key,
+        )
+
     def get_project_status(
         self, project_id: str, *, deadline: float | None = None
     ) -> dict[str, Any]:
@@ -891,9 +981,23 @@ class CliControlPlaneClient:
         return result
 
     def _put(
-        self, path: str, payload: dict[str, Any], *, timeout: float | None = None
+        self,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        deadline: float | None = None,
+        idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        result = self._request("PUT", path, json=payload, retry=False, timeout=timeout)
+        result = self._request(
+            "PUT",
+            path,
+            json=payload,
+            retry=False,
+            timeout=timeout,
+            deadline=deadline,
+            idempotency_key=idempotency_key,
+        )
         assert isinstance(result, dict)
         return result
 

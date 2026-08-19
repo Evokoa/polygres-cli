@@ -36,6 +36,16 @@
     "max_result_columns": 0,
     "max_search_limit": 0,
     "max_values_per_match": 0,
+    "pgcontext_compatibility": {
+      "aligned": 0,
+      "deferred": 0,
+      "managed_equivalent": 0,
+      "missing_sdk": 0,
+      "partial": 0,
+      "sql_only": 0,
+      "stable_items": 0,
+      "target_version": "0.2.0"
+    },
     "point_scroll": false,
     "point_scroll_blocker": "runtime_schema_not_ready",
     "point_scroll_blocker_message": "The project's Context runtime schema is not ready.",
@@ -884,6 +894,42 @@
     }
   },
   "requests": {
+    "BackfillPointsRequest": {
+      "batch_size": 1000,
+      "collection": "pgcontext_fixture"
+    },
+    "BulkPointKeysRequest": {
+      "batch_size": 1000,
+      "collection": "pgcontext_fixture",
+      "source_keys": [
+        "00000000-0000-0000-0000-000000000001"
+      ]
+    },
+    "CandidateSearchRequest": {
+      "candidate_point_ids": [
+        1,
+        2
+      ],
+      "collection": "pgcontext_fixture",
+      "embedding": [
+        0.1,
+        0.2,
+        0.3
+      ],
+      "filter": null,
+      "limit": 10,
+      "vector_name": null
+    },
+    "ClearPayloadRequest": {
+      "collection": "pgcontext_fixture",
+      "source_keys": [
+        "00000000-0000-0000-0000-000000000001"
+      ]
+    },
+    "CollectionAliasRequest": {
+      "alias_name": "support",
+      "target_collection_name": "support_v2"
+    },
     "CollectionCreateRequest": {
       "filter_columns": [
         "tenant_id"
@@ -922,6 +968,17 @@
     "CollectionDeleteRequest": {
       "confirm_collection_id": "00000000-0000-0000-0000-000000000001"
     },
+    "CollectionLimitsRequest": {
+      "max_candidate_budget": 1000,
+      "max_dimensions": 1536,
+      "max_filter_nodes": 64,
+      "max_index_memory_bytes": 1073741824,
+      "max_points": 100000,
+      "max_search_limit": 100,
+      "max_vectors": 4,
+      "query_timeout_ms": 5000,
+      "strict_mode": true
+    },
     "CollectionSetDefaultRequest": {
       "is_default": true
     },
@@ -930,6 +987,23 @@
       "max_search_limit": 100,
       "result_columns": null,
       "text_column": null
+    },
+    "ContextPointDiscoveryRequest": {
+      "collection": "pgcontext_fixture",
+      "context_point_ids": [
+        1,
+        2
+      ],
+      "limit": 10
+    },
+    "ContextQueryPlan": {
+      "kind": "nearest",
+      "limit": 10,
+      "vector": [
+        0.1,
+        0.2,
+        0.3
+      ]
     },
     "ContextSourceRequest": {
       "content_column": null,
@@ -957,6 +1031,23 @@
     "CountRequest": {
       "collection": "pgcontext_fixture",
       "filter": null
+    },
+    "CreateEmbeddingMigrationRequest": {
+      "collection": "pgcontext_fixture",
+      "source_model_name": "text-embedding",
+      "source_model_version": "1",
+      "target_model_name": "text-embedding",
+      "target_model_version": "2",
+      "total_points": 100
+    },
+    "DeletePayloadRequest": {
+      "collection": "pgcontext_fixture",
+      "payload_keys": [
+        "locale"
+      ],
+      "source_keys": [
+        "00000000-0000-0000-0000-000000000001"
+      ]
     },
     "DenseSearchRequest": {
       "collection": "pgcontext_fixture",
@@ -1079,6 +1170,22 @@
         "00000000-0000-0000-0000-000000000001"
       ]
     },
+    "QueryExecuteRequest": {
+      "collection": "pgcontext_fixture",
+      "plan": {
+        "kind": "nearest",
+        "limit": 10,
+        "vector": [
+          0.1,
+          0.2,
+          0.3
+        ]
+      }
+    },
+    "QueryExplainRequest": {
+      "collection": "pgcontext_fixture",
+      "text_column": "content"
+    },
     "RankFusionSearchRequest": {
       "collection": "pgcontext_fixture",
       "context_limit": 50,
@@ -1108,6 +1215,25 @@
       "context": 0.7,
       "graph": 0.3
     },
+    "RawVectorSearchRequest": {
+      "limit": 10,
+      "metric": "cosine",
+      "point_ids": [
+        1
+      ],
+      "query": [
+        0.1,
+        0.2,
+        0.3
+      ],
+      "vectors": [
+        [
+          0.1,
+          0.2,
+          0.3
+        ]
+      ]
+    },
     "RecallCheckRequest": {
       "collection": "pgcontext_fixture",
       "embedding": [
@@ -1120,6 +1246,34 @@
       "minimum_recall": 0.95,
       "vector_name": null
     },
+    "RecommendRequest": {
+      "collection": "pgcontext_fixture",
+      "limit": 10,
+      "negative_point_ids": [
+        2
+      ],
+      "negative_vectors": [],
+      "positive_point_ids": [
+        1
+      ],
+      "positive_vectors": null
+    },
+    "RegisterModelVersionRequest": {
+      "collection": "pgcontext_fixture",
+      "dimensions": 3,
+      "metric": "cosine",
+      "model_name": "text-embedding",
+      "model_version": "1"
+    },
+    "SetPayloadRequest": {
+      "collection": "pgcontext_fixture",
+      "payload": {
+        "locale": "en"
+      },
+      "source_keys": [
+        "00000000-0000-0000-0000-000000000001"
+      ]
+    },
     "TextHybridSearchRequest": {
       "collection": "pgcontext_fixture",
       "embedding": [
@@ -1130,6 +1284,17 @@
       "limit": 10,
       "query": "synthetic context",
       "vector_name": null
+    },
+    "UpdateEmbeddingMigrationRequest": {
+      "processed_points": 50,
+      "status": "running"
+    },
+    "VectorConfigureRequest": {
+      "hnsw_options": {
+        "m": 16
+      },
+      "quantization_options": {},
+      "status": "ready"
     },
     "VectorFirstSearchRequest": {
       "collection": "pgcontext_fixture",
@@ -1185,6 +1350,16 @@
       "max_result_columns": 0,
       "max_search_limit": 0,
       "max_values_per_match": 0,
+      "pgcontext_compatibility": {
+        "aligned": 0,
+        "deferred": 0,
+        "managed_equivalent": 0,
+        "missing_sdk": 0,
+        "partial": 0,
+        "sql_only": 0,
+        "stable_items": 0,
+        "target_version": "0.2.0"
+      },
       "point_scroll": false,
       "point_scroll_blocker": "runtime_schema_not_ready",
       "point_scroll_blocker_message": "The project's Context runtime schema is not ready.",
@@ -1217,6 +1392,22 @@
       "vector_first": false,
       "vector_first_blocker": "runtime_schema_not_ready",
       "vector_first_blocker_message": "The project's Context runtime schema is not ready."
+    },
+    "CollectionAliasDropResponse": {
+      "alias_name": "synthetic",
+      "dropped": false,
+      "request_id": "synthetic"
+    },
+    "CollectionAliasListResponse": {
+      "aliases": [],
+      "request_id": "synthetic"
+    },
+    "CollectionAliasResponse": {
+      "alias": {
+        "alias_name": "synthetic",
+        "collection_name": "synthetic"
+      },
+      "request_id": "synthetic"
     },
     "CollectionGetResponse": {
       "collection": {
@@ -1252,6 +1443,21 @@
         "preserve_indexes": [],
         "preserve_source_columns": [],
         "preserve_source_table": "synthetic"
+      },
+      "request_id": "synthetic"
+    },
+    "CollectionLimitsResponse": {
+      "collection_name": "synthetic",
+      "limits": {
+        "max_candidate_budget": 0,
+        "max_dimensions": 0,
+        "max_filter_nodes": 0,
+        "max_index_memory_bytes": 0,
+        "max_points": 0,
+        "max_search_limit": 0,
+        "max_vectors": 0,
+        "query_timeout_ms": 0,
+        "strict_mode": false
       },
       "request_id": "synthetic"
     },
@@ -1295,6 +1501,11 @@
       "serving_status": "available",
       "status": "ready",
       "updated_at": "2026-07-29T00:00:00Z",
+      "vectors": []
+    },
+    "CollectionVectorsResponse": {
+      "collection_name": "synthetic",
+      "request_id": "synthetic",
       "vectors": []
     },
     "ContextCollection": {
@@ -1480,6 +1691,10 @@
       "candidates": [],
       "request_id": "synthetic"
     },
+    "EmbeddingMigrationsResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
     "ErrorEnvelope": {
       "error": {
         "code": "synthetic",
@@ -1500,6 +1715,22 @@
       "collection_id": "00000000-0000-0000-0000-000000000001",
       "filters": [],
       "request_id": "synthetic"
+    },
+    "IndexAdvisorResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
+    "IndexDiagnosticsResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
+    "IndexMemoryEstimateResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
+    "IndexStatusResponse": {
+      "request_id": "synthetic",
+      "rows": []
     },
     "JointFusionMetadata": {
       "k": 60,
@@ -1540,6 +1771,10 @@
       "rank": 1,
       "score": 0.5
     },
+    "ModelVersionsResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
     "OperationEnvelope": {
       "operation": {
         "attempts": 0,
@@ -1569,6 +1804,32 @@
       "has_more": false,
       "next_cursor": "synthetic",
       "operations": [],
+      "request_id": "synthetic"
+    },
+    "OptimizationStatusResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
+    "PayloadMutationResponse": {
+      "request_id": "synthetic",
+      "results": []
+    },
+    "PgContextCollectionInfoResponse": {
+      "collection": {
+        "collection_id": 1,
+        "collection_name": "pgcontext_fixture",
+        "owner_name": "synthetic_owner",
+        "table_name": "pgcontext_fixture_documents",
+        "table_schema": "public"
+      },
+      "request_id": "req_synthetic"
+    },
+    "PgContextScoredResponse": {
+      "request_id": "synthetic",
+      "results": []
+    },
+    "PointBatchResponse": {
+      "batches": [],
       "request_id": "synthetic"
     },
     "PointMutationResponse": {
@@ -1635,6 +1896,30 @@
       "source_identity": {},
       "warnings": []
     },
+    "QueryCohortStatsResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
+    "QueryExecutionResponse": {
+      "collection": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "name": "synthetic"
+      },
+      "request_id": "synthetic",
+      "results": []
+    },
+    "QueryExecutionStatsResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
+    "QueryExplainResponse": {
+      "collection": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "name": "synthetic"
+      },
+      "request_id": "synthetic",
+      "rows": []
+    },
     "RankedResponse": {
       "collection": {
         "id": "00000000-0000-0000-0000-000000000001",
@@ -1644,6 +1929,10 @@
       "request_id": "synthetic",
       "results": [],
       "warnings": []
+    },
+    "RawVectorSearchResponse": {
+      "request_id": "synthetic",
+      "results": []
     },
     "RecallCheckResponse": {
       "candidate_count": 0,
@@ -1655,6 +1944,29 @@
       "recall": 0.0,
       "request_id": "synthetic",
       "status": "passing"
+    },
+    "TelemetryResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
+    "VacuumAdviceResponse": {
+      "request_id": "synthetic",
+      "rows": []
+    },
+    "VectorConfigureResponse": {
+      "request_id": "synthetic",
+      "vector": {
+        "collection_name": "synthetic",
+        "dimensions": 1,
+        "hnsw_options": {},
+        "metric": "synthetic",
+        "quantization_options": {},
+        "status": "synthetic",
+        "table_name": "synthetic",
+        "table_schema": "synthetic",
+        "vector_column": "synthetic",
+        "vector_name": "synthetic"
+      }
     },
     "VerificationResponse": {
       "checked_at": "2026-07-29T00:00:00Z",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import re
@@ -66,6 +67,7 @@ from polygres_cli.cli_errors import (
     CliError,
     UsageError,
     auth_failure,
+    catalog_cli_error,
 )
 from polygres_cli.cli_notices import display_notices_safely
 from polygres_cli.cli_output import print_kv, print_table, write_error, write_json
@@ -113,8 +115,16 @@ from polygres_cli.context_output import (
     context_wait_progress,
 )
 from polygres_cli.context_wait import context_wait_for_operation
+from polygres_cli.sync_inputs import (
+    automatic_sync_selection,
+    build_source_connection,
+    load_sync_selection,
+    sync_idempotency_key,
+    sync_stage_idempotency_key,
+)
 
 PROJECT_ID_RE = re.compile(r"^p[a-z0-9]{23}$")
+PREFLIGHT_ATTEMPT_ID_RE = re.compile(r"^pf[a-z0-9]{22}$")
 UUID_LIKE_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
@@ -138,6 +148,45 @@ GRAPH_CONFIGURATION_READ_ONLY_KEYS = {
     "updated_at",
 }
 
+# These surfaces expose a database connection or use retired Runtime contracts.
+# They must be stopped locally once the control-plane project payload identifies
+# a synchronized project, before the CLI resolves a database connection or calls
+# a legacy endpoint. The API remains the authoritative enforcement boundary.
+SYNCED_PROJECT_UNAVAILABLE_RESOURCES = frozenset({"db", "env"})
+SYNCED_PROJECT_CONNECTION_FIELDS = frozenset(
+    {
+        "database",
+        "database_dsn",
+        "cnpg_cluster_name",
+        "database_name",
+        "database_password",
+        "database_url",
+        "dsn",
+        "direct_host",
+        "direct_url",
+        "direct_url_without_password",
+        "password",
+        "platform_admin_username",
+        "pooled_host",
+        "pooled_url",
+        "pooled_url_without_password",
+        "port",
+        "project_owner_username",
+        "runtime_namespace",
+        "username",
+    }
+)
+SYNCED_PROJECT_CONNECTION_OBJECT_FIELDS = frozenset(
+    {
+        "connection",
+        "connection_info",
+        "credentials",
+        "direct",
+        "pooled",
+        "source_connection",
+    }
+)
+
 
 class CliArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
@@ -147,6 +196,7 @@ class CliArgumentParser(argparse.ArgumentParser):
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    argv = _normalize_legacy_project_create_args(argv)
     json_output = "--json" in argv
     parser = build_parser()
     try:
@@ -162,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
         command_name = _command_name(args)
         ctx = _context(args, command_id=command_id, command_name=command_name)
         with ctx.client:
+            _guard_synced_project_surface(ctx, args)
             result = int(args.func(ctx, args))
         if result == SUCCESS and args.resource != "notices":
             _display_post_command_notices(base_url=resolve_api_base_url(ctx.config))
@@ -171,6 +222,21 @@ def main(argv: list[str] | None = None) -> int:
     except CliError as exc:
         write_error(exc, json_output=json_output)
         return exc.exit_code
+
+
+def _normalize_legacy_project_create_args(argv: list[str]) -> list[str]:
+    """Keep `projects create NAME` compatible with the typed create namespace."""
+    normalized = list(argv)
+    for index in range(len(normalized) - 1):
+        if normalized[index : index + 2] != ["projects", "create"]:
+            continue
+        value_index = index + 2
+        if value_index >= len(normalized) or normalized[value_index].startswith("-"):
+            return normalized
+        if normalized[value_index] not in {"standard", "sync"}:
+            normalized.insert(value_index, "standard")
+        return normalized
+    return normalized
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -225,6 +291,7 @@ class Context:
             command_id=command_id,
             command_name=command_name,
         )
+        self._resolved_projects: dict[str, dict[str, Any]] = {}
 
     @property
     def json(self) -> bool:
@@ -265,6 +332,7 @@ def _command_name(args: argparse.Namespace) -> str:
     for name in (
         "resource",
         "action",
+        "create_kind",
         "kind",
         "api_action",
         "context_action",
@@ -302,13 +370,69 @@ def _add_projects_parsers(subparsers: argparse._SubParsersAction[argparse.Argume
     use_parser.add_argument("project")
     use_parser.set_defaults(func=handle_projects_use)
     create_parser = sub.add_parser("create", help="create a project")
-    create_parser.add_argument("name")
-    create_parser.add_argument("--no-wait", action="store_true")
-    create_parser.add_argument("--timeout", type=_timeout_seconds, default=600)
-    create_parser.set_defaults(func=handle_projects_create)
+    create_sub = create_parser.add_subparsers(
+        dest="create_kind",
+        required=True,
+        metavar="<project-type>",
+    )
+    standard = create_sub.add_parser("standard", help="create a managed PostgreSQL project")
+    standard.add_argument("name")
+    standard.add_argument("--no-wait", action="store_true")
+    standard.add_argument("--timeout", type=_timeout_seconds, default=600)
+    standard.set_defaults(func=handle_projects_create)
+    _add_sync_create_parsers(create_sub)
     status_parser = sub.add_parser("status", help="show project status")
     status_parser.add_argument("status_project", nargs="?", metavar="project")
     status_parser.set_defaults(func=handle_projects_status)
+
+
+def _add_sync_create_parsers(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser("sync", help="create a synchronized PostgreSQL project")
+    parser.add_argument("name", help="Polygres project name")
+    _add_sync_connection_arguments(parser)
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "--table",
+        action="append",
+        dest="tables",
+        help="table as schema.name (repeatable; schema defaults to public)",
+    )
+    source.add_argument(
+        "--file",
+        help="JSON table selection for explicit sync keys or included columns",
+    )
+    source.add_argument(
+        "--all-eligible",
+        action="store_true",
+        help="synchronize every fully eligible discovered table",
+    )
+    parser.add_argument("--yes", action="store_true")
+    parser.add_argument("--no-wait", action="store_true")
+    parser.add_argument("--timeout", type=_timeout_seconds, default=600)
+    parser.add_argument(
+        "--idempotency-key",
+        help="root key for safely resuming the complete creation workflow",
+    )
+    parser.set_defaults(func=handle_sync_create)
+
+
+def _add_sync_connection_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--connection-env",
+        metavar="NAME",
+        help="environment variable containing the PostgreSQL URL",
+    )
+    parser.add_argument("--host", help="source PostgreSQL host")
+    parser.add_argument("--port", type=int, help="source PostgreSQL port (default: 5432)")
+    parser.add_argument("--database", help="source database name")
+    parser.add_argument("--username", help="source database username")
+    parser.add_argument(
+        "--password-env",
+        metavar="NAME",
+        help="environment variable containing the source password",
+    )
 
 
 def _add_env_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -999,7 +1123,7 @@ def handle_whoami(ctx: Context, args: argparse.Namespace) -> int:
 
 def handle_projects_list(ctx: Context, args: argparse.Namespace) -> int:
     payload = ctx.client.list_projects()
-    projects = _items(payload, "projects")
+    projects = [_redact_synced_project(project) for project in _items(payload, "projects")]
     output = {
         "projects": projects,
         "selected_project_id": ctx.selected_project_id,
@@ -1039,7 +1163,7 @@ def handle_projects_create(ctx: Context, args: argparse.Namespace) -> int:
     payload = ctx.client.create_project(
         args.name, request_timeout=float(args.timeout), deadline=deadline
     )
-    project = _object(payload, "project")
+    project = _redact_synced_project(_object(payload, "project"))
     status = payload.get("status") if isinstance(payload.get("status"), dict) else None
     project_id = _project_api_id(project)
     if not args.no_wait:
@@ -1052,6 +1176,8 @@ def handle_projects_create(ctx: Context, args: argparse.Namespace) -> int:
                 create_request_id=payload.get("request_id"),
                 cause=exc,
             ) from exc
+    if _is_synced_project(project) and isinstance(status, dict):
+        status = _redact_synced_status(status)
     output = {"project": project, "request_id": payload.get("request_id")}
     if status is not None:
         output["status"] = status
@@ -1083,6 +1209,115 @@ def handle_projects_status(ctx: Context, args: argparse.Namespace) -> int:
             ("Runtime status", _summary_value(output["runtime"])),
             ("Resource pressure", _resource_pressure(output["resources"])),
             ("Readiness", _summary_value(output["readiness"])),
+        ],
+    )
+
+
+def handle_sync_create(ctx: Context, args: argparse.Namespace) -> int:
+    _require_confirmation(
+        ctx,
+        args.yes,
+        "Create a synchronized project? The source database remains authoritative; "
+        "direct target mutations and database credentials are unavailable; Polygres manages "
+        "the replication publication and slot.",
+    )
+    connection = _sync_source_connection(ctx, args)
+    root_key = sync_idempotency_key(args.idempotency_key)
+    deadline = time.monotonic() + args.timeout
+    options_payload = ctx.client.project_creation_options()
+    options = (
+        options_payload.get("options")
+        if isinstance(options_payload.get("options"), dict)
+        else {}
+    )
+    _require_sync_enabled(options)
+
+    preflight_payload = ctx.client.create_project_preflight(
+        connection,
+        idempotency_key=sync_stage_idempotency_key(root_key, "source"),
+        request_timeout=float(args.timeout),
+        deadline=deadline,
+    )
+    preflight_payload = _poll_sync_preflight(ctx, preflight_payload, deadline=deadline)
+    preflight = _sync_preflight(preflight_payload)
+    attempt_id = preflight.get("attempt_id")
+    if not isinstance(attempt_id, str) or not PREFLIGHT_ATTEMPT_ID_RE.fullmatch(attempt_id):
+        raise CliError(
+            "SYNC_CREATION_RESPONSE_INVALID",
+            "The source inspection did not return a valid internal attempt ID.",
+        )
+    if preflight.get("status") not in {"source_ready", "admitted"}:
+        raise _sync_source_inspection_error(preflight, options, idempotency_key=root_key)
+
+    selection = (
+        preflight.get("selection") if isinstance(preflight.get("selection"), dict) else {}
+    )
+    selected_count = selection.get("selected_count", 0)
+    if not isinstance(selected_count, int) or isinstance(selected_count, bool):
+        selected_count = 0
+    if preflight.get("status") == "source_ready" and selected_count < 1:
+        available, _, _ = _list_all_preflight_tables(
+            ctx,
+            attempt_id,
+            cursor=None,
+            limit=200,
+            all_pages=True,
+        )
+        selections = _sync_create_selections(ctx, args, available)
+        selection_payload = ctx.client.update_project_preflight_selection(
+            attempt_id,
+            expected_selection_generation=_sync_generation(preflight, "selection_generation"),
+            tables=selections,
+            idempotency_key=sync_stage_idempotency_key(root_key, "tables"),
+        )
+        preflight = _sync_preflight(selection_payload)
+        selected_count = len(selections)
+
+    _require_sync_create_ready(preflight)
+    payload = ctx.client.create_synced_project(
+        args.name,
+        preflight_attempt_id=attempt_id,
+        expected_selection_generation=_sync_generation(preflight, "selection_generation"),
+        idempotency_key=sync_stage_idempotency_key(root_key, "project"),
+        request_timeout=float(args.timeout),
+        deadline=deadline,
+    )
+    project = _redact_synced_project(_object(payload, "project"))
+    project_id = _project_api_id(project)
+    status = payload.get("status") if isinstance(payload.get("status"), dict) else None
+    if not args.no_wait:
+        try:
+            status = _poll_project_status(ctx, project_id, deadline=deadline)
+        except CliError as exc:
+            raise _project_create_wait_error(
+                project=project,
+                project_id=project_id,
+                create_request_id=payload.get("request_id"),
+                cause=exc,
+            ) from exc
+    if isinstance(status, dict):
+        status = _redact_synced_status(status)
+    output: dict[str, Any] = {
+        "project": project,
+        "selected_table_count": selected_count,
+        "idempotency_key": root_key,
+        "request_id": payload.get("request_id"),
+    }
+    if status is not None:
+        output["status"] = status
+    return _emit(
+        ctx,
+        output,
+        [
+            ("Project", project.get("external_id") or project.get("id", "")),
+            (
+                "Status",
+                (status.get("project") or status.get("status"))
+                if isinstance(status, dict)
+                else project.get("status", ""),
+            ),
+            ("Selected tables", selected_count),
+            ("Idempotency key", root_key),
         ],
     )
 
@@ -3037,42 +3272,116 @@ def _resolve_project_id(ctx: Context, positional: str | None) -> str:
     return _project_api_id(project)
 
 
+def _guard_synced_project_surface(ctx: Context, args: argparse.Namespace) -> None:
+    """Reject prohibited client surfaces from the authoritative project payload.
+
+    The mode lookup is deliberately performed before a handler has a chance to
+    request connection information, start ``psql``, or invoke a legacy Runtime
+    operation. Existing standard projects continue through their unchanged
+    handlers; the server independently enforces the same boundary.
+    """
+    if getattr(args, "resource", None) not in SYNCED_PROJECT_UNAVAILABLE_RESOURCES:
+        return
+    candidate = ctx.args.project or ctx.selected_project_id
+    if not candidate:
+        raise CliError(
+            "PROJECT_REQUIRED",
+            "Select a project with `polygres projects use <project>` or pass --project.",
+            exit_code=USAGE,
+        )
+    project = _resolve_project(ctx, candidate)
+    if _is_synced_project(project):
+        raise catalog_cli_error(
+            "SYNCED_PROJECT_SURFACE_UNAVAILABLE",
+            request_id=_request_id(project),
+        )
+
+
 def _resolve_project(ctx: Context, candidate: str) -> dict[str, Any]:
+    cached = ctx._resolved_projects.get(candidate)
+    if cached is not None:
+        return dict(cached)
     if PROJECT_ID_RE.match(candidate):
         payload = ctx.client.get_project(candidate)
         project = _object(payload, "project")
         project.setdefault("external_id", candidate)
         project.setdefault("id", candidate)
         project["request_id"] = payload.get("request_id")
-        return project
-    projects_payload = ctx.client.list_projects()
-    matches = [
-        project
-        for project in _items(projects_payload, "projects")
-        if project.get("name") == candidate
-    ]
-    if not matches:
-        raise CliError(
-            "PROJECT_NOT_FOUND",
-            "Project not found. Run `polygres projects list` and retry with a valid "
-            "project ID or exact name.",
-            exit_code=NOT_FOUND,
-            details={"project": candidate},
-            request_id=projects_payload.get("request_id"),
-        )
-    if len(matches) > 1:
-        raise CliError(
-            "PROJECT_AMBIGUOUS",
-            "Project name matches more than one project.",
-            exit_code=CONFLICT,
-            details={
-                "project": candidate,
-                "matches": [_project_api_id(project) for project in matches],
-            },
-        )
-    project = dict(matches[0])
-    project["request_id"] = projects_payload.get("request_id")
+    else:
+        projects_payload = ctx.client.list_projects()
+        matches = [
+            project
+            for project in _items(projects_payload, "projects")
+            if project.get("name") == candidate
+        ]
+        if not matches:
+            raise CliError(
+                "PROJECT_NOT_FOUND",
+                "Project not found. Run `polygres projects list` and retry with a valid "
+                "project ID or exact name.",
+                exit_code=NOT_FOUND,
+                details={"project": candidate},
+                request_id=projects_payload.get("request_id"),
+            )
+        if len(matches) > 1:
+            raise CliError(
+                "PROJECT_AMBIGUOUS",
+                "Project name matches more than one project.",
+                exit_code=CONFLICT,
+                details={
+                    "project": candidate,
+                    "matches": [_project_api_id(project) for project in matches],
+                },
+            )
+        project = dict(matches[0])
+        project["request_id"] = projects_payload.get("request_id")
+
+    project = _redact_synced_project(project)
+    ctx._resolved_projects[candidate] = dict(project)
+    project_id = project.get("external_id") or project.get("id")
+    if isinstance(project_id, str) and project_id:
+        ctx._resolved_projects[project_id] = dict(project)
     return project
+
+
+def _is_synced_project(project: dict[str, Any]) -> bool:
+    """Return whether a public project DTO identifies synchronized mode.
+
+    Older control-plane responses omit ``project_mode``; they remain standard
+    for backwards compatibility. Only the authoritative ``synced`` value turns
+    on the local safety boundary.
+    """
+    return project.get("project_mode") == "synced"
+
+
+def _request_id(payload: dict[str, Any]) -> str | None:
+    value = payload.get("request_id")
+    return value if isinstance(value, str) and value else None
+
+
+def _redact_synced_project(project: dict[str, Any]) -> dict[str, Any]:
+    """Defensively keep database metadata out of synchronized-project output.
+
+    Control-plane DTOs are responsible for structural redaction. The CLI also
+    removes the prohibited fields if it receives an older or malformed payload,
+    so a client update cannot turn a backend regression into a terminal leak.
+    """
+    output = dict(project)
+    if not _is_synced_project(output):
+        return output
+    for field in SYNCED_PROJECT_CONNECTION_FIELDS | SYNCED_PROJECT_CONNECTION_OBJECT_FIELDS:
+        output.pop(field, None)
+    return output
+
+
+def _redact_synced_status(status: dict[str, Any]) -> dict[str, Any]:
+    """Remove connection state from a synchronized-project status."""
+    output = dict(status)
+    for field in SYNCED_PROJECT_CONNECTION_FIELDS | {"namespace"}:
+        output.pop(field, None)
+    for field in ("direct", "pooled"):
+        output.pop(field, None)
+    return output
 
 
 def _project_api_id(project: dict[str, Any]) -> str:
@@ -3178,6 +3487,8 @@ def _project_status_output(project_id: str, payload: dict[str, Any]) -> dict[str
                 "id": project_id,
                 "status": status.get("project") or status.get("status"),
             }
+            if "project_mode" in status:
+                project["project_mode"] = status["project_mode"]
         if not runtime:
             runtime = {
                 key: status[key]
@@ -3204,6 +3515,13 @@ def _project_status_output(project_id: str, payload: dict[str, Any]) -> dict[str
             readiness = {
                 key: status[key] for key in ("graph", "hybrid", "text", "vector") if key in status
             }
+
+    if not project and payload.get("project_mode") == "synced":
+        project = {"id": project_id, "project_mode": "synced"}
+    project = _redact_synced_project(project)
+    if _is_synced_project(project):
+        runtime = _redact_synced_status(runtime)
+        readiness = _redact_synced_status(readiness)
 
     output = {
         "project": project,
@@ -3249,6 +3567,274 @@ def _poll_project_status(ctx: Context, project_id: str, *, deadline: float) -> d
         exit_code=UNAVAILABLE,
         details={"status": last_status},
     )
+
+
+def _sync_source_connection(ctx: Context, args: argparse.Namespace) -> dict[str, Any]:
+    return build_source_connection(
+        connection_environment=args.connection_env,
+        host=args.host,
+        port=args.port,
+        database=args.database,
+        username=args.username,
+        password_environment=args.password_env,
+        environment=os.environ,
+        prompt_secret=getpass.getpass,
+        interactive=sys.stdin.isatty() and not ctx.json,
+    )
+
+
+def _require_sync_enabled(options: dict[str, Any]) -> None:
+    enabled = options.get("synced_projects_enabled")
+    if not isinstance(enabled, bool):
+        raise CliError(
+            "SYNC_CREATION_OPTIONS_INVALID",
+            "The API did not return sync-project availability.",
+        )
+    if enabled:
+        return
+    reason = options.get("disabled_reason")
+    message = "Synchronized project creation is not currently enabled."
+    if isinstance(reason, str) and reason:
+        message = f"{message} {reason}"
+    raise CliError("SYNC_CREATION_DISABLED", message, exit_code=CONFLICT)
+
+
+def _sync_create_selections(
+    ctx: Context,
+    args: argparse.Namespace,
+    available_tables: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if args.file:
+        return load_sync_selection(_readable_file(args.file))
+    if args.tables:
+        return automatic_sync_selection(args.tables, available_tables)
+
+    selectable = [
+        table
+        for table in available_tables
+        if table.get("schema_name") == "public"
+        and table.get("eligible") is True
+        and (
+            isinstance(table.get("sync_key"), dict)
+            or bool(table.get("sync_key_candidates"))
+        )
+    ]
+    if not selectable:
+        raise CliError(
+            "SYNC_TABLE_SELECTION_UNAVAILABLE",
+            "The source inspection found no fully eligible tables with a usable sync key.",
+            exit_code=CONFLICT,
+        )
+    selectable_names = [
+        f"{table.get('schema_name')}.{table.get('table_name')}" for table in selectable
+    ]
+    if args.all_eligible:
+        return automatic_sync_selection(selectable_names, available_tables)
+    if not sys.stdin.isatty() or ctx.json:
+        raise CliError(
+            "SYNC_TABLE_SELECTION_REQUIRED",
+            "Select at least one table with --table, --file, or --all-eligible.",
+            exit_code=USAGE,
+        )
+
+    if not ctx.quiet:
+        rows = [
+            {
+                "table": name,
+                "sync_key": _sync_table_key_summary(table),
+                "estimated_rows": table.get("estimated_rows"),
+                "estimated_bytes": table.get("estimated_total_bytes"),
+            }
+            for name, table in zip(selectable_names, selectable, strict=True)
+        ]
+        print_table(rows, ["table", "sync_key", "estimated_rows", "estimated_bytes"])
+    sys.stderr.write("Select tables (comma-separated schema.table values, or 'all'): ")
+    answer = sys.stdin.readline().strip()
+    if answer.lower() == "all":
+        selected_names = selectable_names
+    else:
+        selected_names = [value.strip() for value in answer.split(",") if value.strip()]
+    if not selected_names:
+        raise CliError(
+            "SYNC_TABLE_SELECTION_REQUIRED",
+            "At least one source table must be selected.",
+            exit_code=USAGE,
+        )
+    return automatic_sync_selection(selected_names, available_tables)
+
+
+def _sync_source_inspection_error(
+    preflight: dict[str, Any],
+    options: dict[str, Any],
+    *,
+    idempotency_key: str,
+) -> CliError:
+    failure = preflight.get("failure") if isinstance(preflight.get("failure"), dict) else {}
+    code = str(failure.get("code") or "SYNC_SOURCE_INSPECTION_FAILED")
+    message = str(failure.get("message") or "The source database did not pass sync checks.")
+    egress_ips = options.get("egress_ips") if isinstance(options.get("egress_ips"), list) else []
+    allowlist = [
+        str(value.get("ip"))
+        for value in egress_ips
+        if isinstance(value, dict) and value.get("ip")
+    ]
+    if allowlist:
+        message += " Ensure the source allows connections from: " + ", ".join(allowlist) + "."
+    return CliError(
+        code,
+        message,
+        details={
+            "checks": preflight.get("checks", []),
+            "source_allowlist_ips": allowlist,
+            "idempotency_key": idempotency_key,
+        },
+    )
+
+
+def _sync_preflight(payload: dict[str, Any]) -> dict[str, Any]:
+    preflight = payload.get("preflight")
+    if not isinstance(preflight, dict):
+        raise CliError(
+            "SYNC_CREATION_RESPONSE_INVALID",
+            "The API returned an invalid source-inspection response. Retry the command; contact "
+            "support if it happens again.",
+            request_id=str(payload.get("request_id") or "") or None,
+        )
+    return preflight
+
+
+def _sync_generation(preflight: dict[str, Any], field: str) -> int:
+    value = preflight.get(field)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise CliError(
+            "SYNC_CREATION_RESPONSE_INVALID",
+            f"The API response did not include a valid {field}.",
+        )
+    return value
+
+
+def _poll_sync_preflight(
+    ctx: Context, initial_payload: dict[str, Any], *, deadline: float
+) -> dict[str, Any]:
+    payload = initial_payload
+    preflight = _sync_preflight(payload)
+    attempt_id = preflight.get("attempt_id")
+    if not isinstance(attempt_id, str) or not PREFLIGHT_ATTEMPT_ID_RE.fullmatch(attempt_id):
+        raise CliError(
+            "SYNC_CREATION_RESPONSE_INVALID",
+            "The API response did not include a valid internal source-inspection token.",
+            request_id=str(payload.get("request_id") or "") or None,
+        )
+    terminal = {
+        "source_ready",
+        "connection_failed",
+        "admitted",
+        "rejected",
+        "cancelled",
+        "expired",
+    }
+    while time.monotonic() <= deadline:
+        status = preflight.get("status")
+        if status in terminal:
+            return payload
+        _write_source_inspection_progress(ctx, preflight)
+        _sleep_until_deadline(_poll_interval(payload), deadline)
+        if time.monotonic() >= deadline:
+            break
+        payload = ctx.client.get_project_preflight(attempt_id, deadline=deadline)
+        preflight = _sync_preflight(payload)
+    raise CliError(
+        "TIMEOUT",
+        "Timed out while inspecting the source database. Re-run the same creation command with "
+        "the same --idempotency-key to resume safely.",
+        exit_code=UNAVAILABLE,
+        details={"status": preflight.get("status")},
+    )
+
+
+def _write_source_inspection_progress(ctx: Context, inspection: dict[str, Any]) -> None:
+    if ctx.json or ctx.quiet:
+        return
+    status = inspection.get("status") or "in progress"
+    sys.stderr.write(f"Source inspection: {status}\n")
+
+
+def _list_all_preflight_tables(
+    ctx: Context,
+    attempt_id: str,
+    *,
+    cursor: str | None,
+    limit: int,
+    all_pages: bool,
+) -> tuple[list[dict[str, Any]], str | None, object]:
+    tables: list[dict[str, Any]] = []
+    next_cursor = cursor
+    request_id: object = None
+    seen_cursors: set[str] = set()
+    while True:
+        payload = ctx.client.list_project_preflight_tables(
+            attempt_id,
+            cursor=next_cursor,
+            limit=limit,
+        )
+        tables.extend(_items(payload, "tables"))
+        request_id = payload.get("request_id") or request_id
+        value = payload.get("next_cursor")
+        next_cursor = value if isinstance(value, str) and value else None
+        if not all_pages or next_cursor is None:
+            return tables, next_cursor, request_id
+        if next_cursor in seen_cursors:
+            raise CliError(
+                "SYNC_TABLE_PAGINATION_INVALID",
+                "The API returned a repeated sync table cursor.",
+            )
+        seen_cursors.add(next_cursor)
+
+
+def _sync_table_key_summary(table: dict[str, Any]) -> str:
+    sync_key = table.get("sync_key")
+    if isinstance(sync_key, dict):
+        columns = sync_key.get("columns")
+        if isinstance(columns, list):
+            return f"{sync_key.get('kind', 'key')} ({', '.join(str(value) for value in columns)})"
+        return str(sync_key.get("kind") or "key")
+    candidates = table.get("sync_key_candidates")
+    if isinstance(candidates, list) and candidates:
+        return f"{len(candidates)} unique candidate(s)"
+    return ""
+
+
+def _require_sync_create_ready(preflight: dict[str, Any]) -> None:
+    status = preflight.get("status")
+    if status not in {"source_ready", "admitted"}:
+        raise CliError(
+            "SYNC_SOURCE_NOT_READY",
+            "The source database has not completed sync admission checks.",
+            exit_code=CONFLICT,
+        )
+    selection = preflight.get("selection")
+    selected_count = selection.get("selected_count") if isinstance(selection, dict) else 0
+    if (
+        isinstance(selected_count, bool)
+        or not isinstance(selected_count, int)
+        or selected_count < 1
+    ):
+        raise CliError(
+            "SYNC_SELECTION_REQUIRED",
+            "No source tables were selected for synchronization.",
+            exit_code=CONFLICT,
+        )
+    valid_actions = preflight.get("valid_actions")
+    if (
+        status == "source_ready"
+        and isinstance(valid_actions, list)
+        and "create_project" not in valid_actions
+    ):
+        raise CliError(
+            "SYNC_SOURCE_NOT_ADMISSIBLE",
+            "The source database is not currently eligible for project creation.",
+            exit_code=CONFLICT,
+        )
 
 
 def _project_create_wait_error(

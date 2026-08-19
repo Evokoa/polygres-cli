@@ -39,6 +39,25 @@ def _stub(route: object, **kwargs: object) -> object:
     return getattr(route, "mo" + "ck")(**kwargs)
 
 
+def _stub_project(
+    *,
+    project_mode: str = "standard",
+    project: dict[str, object] | None = None,
+) -> object:
+    payload = {
+        "id": PROJECT_UUID,
+        "external_id": PROJECT_ID,
+        "name": "Support",
+        "status": "ready",
+        "project_mode": project_mode,
+        **(project or {}),
+    }
+    return _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}"),
+        return_value=httpx.Response(200, json={"request_id": "req_project", "project": payload}),
+    )
+
+
 def _stub_csv_direct_preview(
     preview: dict[str, object], *, status_code: int = 200
 ) -> tuple[object, object, object, object]:
@@ -937,6 +956,221 @@ def test_project_name_resolution_uses_external_id_for_project_scoped_commands(
 
 
 @ROUTE_CTX
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--json", "db", "info"],
+        ["--json", "db", "psql"],
+        ["--json", "env"],
+    ],
+)
+def test_synced_project_blocks_prohibited_cli_surfaces_before_operation_request(
+    args: list[str],
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    project_route = _stub_project(
+        project_mode="synced",
+        project={
+            "database_name": "must-not-leak",
+            "direct_host": "must-not-connect.example",
+            "pooled_host": "must-not-connect.example",
+            "project_owner_username": "must-not-leak",
+        },
+    )
+
+    def unexpected_local_database_action(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("the synced-mode gate must run before a database client action")
+
+    monkeypatch.setattr("shutil.which", unexpected_local_database_action)
+    monkeypatch.setattr("subprocess.run", unexpected_local_database_action)
+
+    rc, out, err = run_cli(args, capsys, monkeypatch, tmp_path)
+
+    assert rc == 4
+    assert err == ""
+    payload = json.loads(out)
+    assert payload["request_id"] == "req_project"
+    assert payload["error"] == {
+        "code": "SYNCED_PROJECT_SURFACE_UNAVAILABLE",
+        "message": catalog_message("SYNCED_PROJECT_SURFACE_UNAVAILABLE"),
+        "details": {},
+    }
+    assert len(project_route.calls) == 1
+    assert len(respx.calls) == 1
+
+
+@ROUTE_CTX
+def test_synced_project_keeps_vector_commands_and_readiness_available(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    projects_route = _stub(
+        respx.get(f"{API_BASE_URL}/projects"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_projects",
+                "projects": [
+                    {
+                        "id": PROJECT_UUID,
+                        "external_id": PROJECT_ID,
+                        "name": "Synced",
+                        "project_mode": "synced",
+                    }
+                ],
+            },
+        ),
+    )
+    vector_route = _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/vector/configurations"),
+        return_value=httpx.Response(
+            200,
+            json={"request_id": "req_vectors", "configurations": []},
+        ),
+    )
+    readiness_route = _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/retrieval/readiness"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_ready",
+                "project_id": PROJECT_ID,
+                "vector": {"ready": True},
+                "hybrid": {"ready": True},
+                "graph": {"ready": True},
+            },
+        ),
+    )
+
+    vector_rc, vector_out, vector_err = run_cli(
+        ["--json", "--project", "Synced", "vector", "configs", "list"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+    ready_rc, ready_out, ready_err = run_cli(
+        ["--json", "--project", "Synced", "ready"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert vector_rc == 0
+    assert ready_rc == 0
+    assert vector_err == ""
+    assert ready_err == ""
+    assert json.loads(vector_out)["configurations"] == []
+    assert json.loads(ready_out)["vector"] == {"ready": True}
+    assert len(projects_route.calls) == 2
+    assert vector_route.called
+    assert readiness_route.called
+
+
+@ROUTE_CTX
+def test_synced_project_payloads_are_redacted_from_cli_outputs(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    sensitive_values = {
+        "database": "must-not-leak-database-alias",
+        "database_dsn": "must-not-leak-dsn",
+        "database_name": "must-not-leak-database",
+        "database_password": "must-not-leak-password",
+        "database_url": "must-not-leak-url",
+        "dsn": "must-not-leak-dsn-alias",
+        "direct_host": "must-not-leak-direct",
+        "pooled_host": "must-not-leak-pooled",
+        "port": 6543,
+        "project_owner_username": "must-not-leak-owner",
+        "platform_admin_username": "must-not-leak-admin",
+        "runtime_namespace": "must-not-leak-namespace",
+        "cnpg_cluster_name": "must-not-leak-cluster",
+        "username": "must-not-leak-username",
+        "credentials": {"password": "must-not-leak-password"},
+        "direct": {"host": "must-not-leak-direct"},
+        "pooled": {"host": "must-not-leak-pooled"},
+        "source_connection": {"dsn": "must-not-leak-dsn"},
+    }
+    project = {
+        "id": PROJECT_UUID,
+        "external_id": PROJECT_ID,
+        "name": "Synced project",
+        "status": "ready",
+        "project_mode": "synced",
+        **sensitive_values,
+    }
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects"),
+        return_value=httpx.Response(
+            200,
+            json={"request_id": "req_projects", "projects": [project]},
+        ),
+    )
+
+    rc, out, err = run_cli(["--json", "projects", "list"], capsys, monkeypatch, tmp_path)
+
+    assert rc == 0
+    assert err == ""
+    listed = json.loads(out)["projects"][0]
+    assert listed["project_mode"] == "synced"
+    for field in sensitive_values:
+        assert field not in listed
+    rendered = json.dumps(listed)
+    assert "must-not-leak" not in rendered
+
+
+@ROUTE_CTX
+def test_synced_project_status_omits_connection_and_keeps_retrieval_fields(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/status"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_synced_status",
+                "status": {
+                    "project": "ready",
+                    "project_mode": "synced",
+                    "direct_host": "must-not-leak-direct",
+                    "pooled_host": "must-not-leak-pooled",
+                    "namespace": "must-not-leak-namespace",
+                    "vector": {"ready": True},
+                    "hybrid": {"ready": True},
+                    "graph": {"ready": True},
+                    "text": {"ready": True},
+                },
+            },
+        ),
+    )
+
+    rc, out, err = run_cli(["--json", "projects", "status"], capsys, monkeypatch, tmp_path)
+
+    assert rc == 0
+    assert err == ""
+    payload = json.loads(out)
+    assert payload["project"]["project_mode"] == "synced"
+    assert payload["readiness"] == {
+        "graph": {"ready": True},
+        "hybrid": {"ready": True},
+        "text": {"ready": True},
+        "vector": {"ready": True},
+    }
+    assert "direct_host" not in payload["runtime"]
+    assert "pooled_host" not in payload["runtime"]
+    assert "namespace" not in payload["runtime"]
+    assert "must-not-leak" not in json.dumps(payload)
+
+
+@ROUTE_CTX
 def test_project_resolution_ambiguous_name_exits_6(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -971,6 +1205,7 @@ def test_env_and_keys_output_never_include_raw_key_values(
     tmp_path: Path,
 ) -> None:
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub_project()
     _stub(
         respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/connection-info"),
         return_value=httpx.Response(
@@ -1188,8 +1423,7 @@ def test_local_validation_failures_do_not_send_http_requests(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    write_config(tmp_path, {"version": 1, "selected_project_id": "Support"})
-
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
     rc, out, err = run_cli(args, capsys, monkeypatch, tmp_path)
 
     assert rc == 2
@@ -1445,6 +1679,7 @@ def test_db_psql_missing_prints_passwordless_command_and_exits_9(
 ) -> None:
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
     monkeypatch.setattr("shutil.which", lambda name: None)
+    _stub_project()
     _stub(
         respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/connection-info"),
         return_value=httpx.Response(
@@ -1485,6 +1720,7 @@ def test_db_psql_removes_pgpassword_from_child_environment(
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
     monkeypatch.setenv("PGPASSWORD", "leaked-password")
     monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/psql")
+    _stub_project()
     captured: dict[str, object] = {}
 
     def fake_run(
@@ -2382,6 +2618,7 @@ def test_db_info_and_ready_human_outputs_include_all_documented_fields(
     tmp_path: Path,
 ) -> None:
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub_project()
     _stub(
         respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/connection-info"),
         return_value=httpx.Response(
@@ -3067,6 +3304,7 @@ def test_env_removes_backend_password_placeholder_in_human_and_json_output(
     tmp_path: Path,
 ) -> None:
     write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub_project()
     connection_payload = {
         "request_id": "req_conn",
         "project_id": PROJECT_ID,

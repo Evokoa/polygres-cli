@@ -37,6 +37,50 @@ polygres ready
 
 `polygres login` opens the dashboard for approval. On a headless terminal, it prints a URL that you can open in another browser. Run `polygres logout` when you want to revoke the session and remove the local credentials.
 
+## Synchronized PostgreSQL projects
+
+Create a synchronized project with one command:
+
+```bash
+# Set SOURCE_DATABASE_URL through your shell or secret manager, then reference
+# the variable by name so the URL is not passed as a command argument.
+polygres projects create sync analytics \
+  --connection-env SOURCE_DATABASE_URL \
+  --table public.customers \
+  --table public.orders \
+  --yes
+```
+
+The command checks sync availability, inspects the source, discovers and selects
+tables, creates the project, and waits for readiness. Use `--all-eligible` instead
+of repeated `--table` options to synchronize every fully eligible discovered
+table. In an interactive terminal, omitting all table-selection options opens a
+selection prompt.
+
+The command accepts either a PostgreSQL URL through `--connection-env NAME`, or
+structured `--host`, `--database`, `--username`, and `--password-env NAME`
+options. In an interactive terminal, the URL or structured password can instead
+be entered through a hidden prompt. The CLI intentionally has no plaintext URL
+or password argument.
+
+For explicit unique-key choices or partial-table sync, pass `--file
+selection.json`. The file contains a `tables` array using `schema_name`,
+`table_name`, optional `sync_key_index_name`, and optional `included_columns`
+fields. Pass `--idempotency-key` to safely resume the full workflow after an
+ambiguous timeout.
+
+Projects whose control-plane payload has `project_mode: "synced"` do not expose
+database connection metadata. The CLI rejects `db info`, `db psql`, and `env`
+with `SYNCED_PROJECT_SURFACE_UNAVAILABLE` (permission exit code `4`) before it
+opens a database client. Readiness, vector, hybrid, graph, text-search, and
+pgContext (`context`) commands remain available when the project is ready.
+
+The existing standard-project shorthand remains supported:
+
+```bash
+polygres projects create <name>
+```
+
 ## Common workflows
 
 ### Load data and apply migrations
@@ -125,7 +169,7 @@ Service and release notices are written to standard error, so standard output an
 
 ## Version and support
 
-Package version: [`0.3.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.3.0).
+Package version: [`0.4.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.4.0).
 
 Useful commands:
 
@@ -144,4 +188,4 @@ Users of the former combined `polygres` package should install both packages sep
 
 ## Changelog
 
-See the [CLI 0.3.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.3.0) for release changes.
+See the [CLI 0.4.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.4.0) for release changes.

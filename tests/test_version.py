@@ -54,10 +54,10 @@ def test_release_documentation_names_current_cli_version() -> None:
     readme = (root / "README.md").read_text(encoding="utf-8")
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    assert "Package version: [`0.3.0`]" in readme
-    assert "python-cli-v0.3.0" in readme
-    assert "CLI 0.3.0 release notes" in readme
-    assert "## 0.3.0 - 2026-08-14" in changelog
+    assert "Package version: [`0.4.0`]" in readme
+    assert "python-cli-v0.4.0" in readme
+    assert "CLI 0.4.0 release notes" in readme
+    assert "## 0.4.0 - 2026-08-19" in changelog
 
 
 @pytest.mark.parametrize(

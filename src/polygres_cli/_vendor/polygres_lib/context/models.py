@@ -231,6 +231,35 @@ class CollectionDeleteRequest(ContextRequest):
     confirm_collection_id: UUID
 
 
+class CollectionAliasRequest(ContextRequest):
+    alias_name: str
+    target_collection_name: str
+
+    @field_validator("alias_name", "target_collection_name")
+    @classmethod
+    def _alias_name(cls, value: str, info) -> str:
+        require_valid(validate_identifier(value, field=info.field_name))
+        return value
+
+
+class CollectionLimitsRequest(ContextRequest):
+    strict_mode: bool
+    max_dimensions: int | None = Field(default=None, ge=1, le=16_000)
+    max_vectors: int | None = Field(default=None, ge=1)
+    max_points: int | None = Field(default=None, ge=1)
+    max_filter_nodes: int | None = Field(default=None, ge=1)
+    max_search_limit: int | None = Field(default=None, ge=1)
+    max_candidate_budget: int | None = Field(default=None, ge=1)
+    query_timeout_ms: int | None = Field(default=None, ge=1)
+    max_index_memory_bytes: int | None = Field(default=None, ge=1)
+
+
+class VectorConfigureRequest(ContextRequest):
+    hnsw_options: dict[str, Any]
+    quantization_options: dict[str, Any]
+    status: Literal["ready", "building", "disabled", "failed"]
+
+
 class FilterColumnRequest(ContextRequest):
     key: str
     column: str
@@ -262,6 +291,123 @@ class PointKeysRequest(ContextRequest):
         normalized, violations = validate_source_keys(value)
         require_valid(violations)
         return normalized
+
+
+class BulkPointKeysRequest(PointKeysRequest):
+    collection: str
+    batch_size: int = Field(default=1000, ge=1)
+
+
+class BackfillPointsRequest(ContextRequest):
+    collection: str
+    batch_size: int = Field(default=1000, ge=1)
+
+
+class SetPayloadRequest(PointKeysRequest):
+    collection: str
+    payload: dict[str, Any] = Field(min_length=1)
+
+
+class DeletePayloadRequest(PointKeysRequest):
+    collection: str
+    payload_keys: list[str] = Field(min_length=1)
+
+    @field_validator("payload_keys")
+    @classmethod
+    def _payload_keys(cls, value: list[str]) -> list[str]:
+        for key in value:
+            require_valid(validate_identifier(key, field="payload_key"))
+        return value
+
+
+class ClearPayloadRequest(PointKeysRequest):
+    collection: str
+
+
+class RecommendRequest(ContextRequest):
+    collection: str
+    positive_point_ids: list[int] | None = None
+    negative_point_ids: list[int] = Field(default_factory=list)
+    positive_vectors: list[list[float]] | None = None
+    negative_vectors: list[list[float]] = Field(default_factory=list)
+    limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
+
+    @model_validator(mode="after")
+    def _examples(self) -> RecommendRequest:
+        point_form = self.positive_point_ids is not None
+        vector_form = self.positive_vectors is not None
+        if point_form == vector_form:
+            raise ValueError("provide exactly one positive example form")
+        if point_form:
+            ids = (self.positive_point_ids or []) + self.negative_point_ids
+            if not self.positive_point_ids or any(point_id <= 0 for point_id in ids):
+                raise ValueError("recommendation point ids must be positive")
+            if self.negative_vectors:
+                raise ValueError("point and vector examples cannot be mixed")
+        else:
+            if self.negative_point_ids:
+                raise ValueError("point and vector examples cannot be mixed")
+            for vector in (self.positive_vectors or []) + self.negative_vectors:
+                require_valid(validate_embedding(vector))
+            if not self.positive_vectors:
+                raise ValueError("positive_vectors must not be empty")
+        return self
+
+
+class ContextPointDiscoveryRequest(ContextRequest):
+    collection: str
+    context_point_ids: list[int] = Field(min_length=1)
+    limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
+
+    @field_validator("context_point_ids")
+    @classmethod
+    def _context_ids(cls, value: list[int]) -> list[int]:
+        if any(point_id <= 0 for point_id in value):
+            raise ValueError("context point ids must be positive")
+        return value
+
+
+class RegisterModelVersionRequest(ContextRequest):
+    collection: str
+    model_name: str = Field(min_length=1, max_length=128)
+    model_version: str = Field(min_length=1, max_length=128)
+    dimensions: int = Field(ge=1, le=16_000)
+    metric: Literal["l2", "inner_product", "cosine", "l1"]
+
+
+class CreateEmbeddingMigrationRequest(ContextRequest):
+    collection: str
+    source_model_name: str = Field(min_length=1, max_length=128)
+    source_model_version: str = Field(min_length=1, max_length=128)
+    target_model_name: str = Field(min_length=1, max_length=128)
+    target_model_version: str = Field(min_length=1, max_length=128)
+    total_points: int = Field(ge=0)
+
+
+class UpdateEmbeddingMigrationRequest(ContextRequest):
+    processed_points: int = Field(ge=0)
+    status: Literal["planned", "running", "completed", "failed"]
+
+
+class RawVectorSearchRequest(ContextRequest):
+    query: list[float]
+    point_ids: list[int] = Field(min_length=1)
+    vectors: list[list[float]] = Field(min_length=1)
+    metric: Literal["l2", "inner_product", "cosine", "l1"]
+    limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
+
+    @model_validator(mode="after")
+    def _vectors_match(self) -> RawVectorSearchRequest:
+        require_valid(validate_embedding(self.query))
+        if len(self.point_ids) != len(self.vectors):
+            raise ValueError("point_ids and vectors must have the same length")
+        if any(point_id < 0 for point_id in self.point_ids):
+            raise ValueError("point ids must not be negative")
+        for vector in self.vectors:
+            require_valid(validate_embedding(vector))
+            if len(vector) != len(self.query):
+                raise ValueError("candidate vector dimensions must match query")
+        return self
 
 
 class CountRequest(ContextRequest):
@@ -302,6 +448,17 @@ class DenseSearchRequest(CountRequest):
     def _vector_name(cls, value: str | None) -> str | None:
         if value is not None:
             require_valid(validate_identifier(value, field="vector_name"))
+        return value
+
+
+class CandidateSearchRequest(DenseSearchRequest):
+    candidate_point_ids: list[int] = Field(min_length=1)
+
+    @field_validator("candidate_point_ids")
+    @classmethod
+    def _candidate_ids(cls, value: list[int]) -> list[int]:
+        if any(point_id <= 0 for point_id in value):
+            raise ValueError("candidate point ids must be positive")
         return value
 
 
@@ -509,6 +666,159 @@ class JointSearchRequest(GraphSearchBase):
         return self
 
 
+class ContextQueryPlan(ContextRequest):
+    """Immutable JSON query plan compatible with pgContext 0.2.0 builders."""
+
+    kind: Literal[
+        "nearest",
+        "sparse_nearest",
+        "full_text",
+        "late_interaction",
+        "recommend",
+        "discover",
+        "lookup",
+        "prefetch",
+        "weight",
+        "score_threshold",
+        "formula",
+        "rerank",
+    ]
+    vector: list[float] | str | None = None
+    vector_name: str | None = None
+    filter: dict[str, Any] | None = None
+    text_query: str | None = None
+    text_column: str | None = None
+    query_vectors: list[list[float]] | None = None
+    candidates_per_query: int | None = Field(default=None, ge=1)
+    positive_point_ids: list[int] | None = None
+    negative_point_ids: list[int] | None = None
+    context_point_ids: list[int] | None = None
+    point_ids: list[int] | None = None
+    branches: list[ContextQueryPlan] | None = None
+    branch: ContextQueryPlan | None = None
+    weight: float | None = None
+    min_score: float | None = None
+    max_score: float | None = None
+    formula: str | None = None
+    limit: int | None = Field(default=None, ge=1)
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode="json", exclude_none=True)
+
+    @field_validator("vector_name", "text_column")
+    @classmethod
+    def _query_identifier(cls, value: str | None, info) -> str | None:
+        if value is not None:
+            require_valid(validate_identifier(value, field=info.field_name))
+        return value
+
+    @field_validator("text_query", "formula")
+    @classmethod
+    def _query_text(cls, value: str | None, info) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError(f"{info.field_name} must not be blank")
+        return value
+
+    @field_validator("positive_point_ids", "negative_point_ids", "context_point_ids", "point_ids")
+    @classmethod
+    def _query_point_ids(cls, value: list[int] | None, info) -> list[int] | None:
+        if value is not None and any(point_id <= 0 for point_id in value):
+            raise ValueError(f"{info.field_name} must contain only positive point ids")
+        return value
+
+    @model_validator(mode="after")
+    def _query_shape(self) -> ContextQueryPlan:
+        required = {
+            "nearest": {"vector", "limit"},
+            "sparse_nearest": {"vector_name", "vector", "limit"},
+            "full_text": {"text_query", "text_column", "limit"},
+            "late_interaction": {"query_vectors", "candidates_per_query", "limit"},
+            "recommend": {"positive_point_ids", "negative_point_ids", "limit"},
+            "discover": {"context_point_ids", "limit"},
+            "lookup": {"point_ids"},
+            "prefetch": {"branches"},
+            "weight": {"branch", "weight"},
+            "score_threshold": {"branch"},
+            "formula": {"branch", "formula"},
+            "rerank": {"branch", "limit"},
+        }[self.kind]
+        allowed = required | {
+            "nearest": {"vector_name", "filter"},
+            "sparse_nearest": {"filter"},
+            "score_threshold": {"min_score", "max_score"},
+        }.get(self.kind, set())
+        supplied = self.model_fields_set - {"kind"}
+        missing = required - supplied
+        unexpected = supplied - allowed
+        if missing:
+            raise ValueError(f"{self.kind} query plan is missing {sorted(missing)}")
+        if unexpected:
+            raise ValueError(f"{self.kind} query plan does not accept {sorted(unexpected)}")
+        if self.kind == "nearest":
+            if not isinstance(self.vector, list):
+                raise ValueError("nearest vector must be a dense vector")
+            require_valid(validate_embedding(self.vector))
+        elif self.kind == "sparse_nearest":
+            if not isinstance(self.vector, str) or not self.vector.strip():
+                raise ValueError("sparse_nearest vector must be a sparse vector string")
+        if self.query_vectors is not None:
+            if not self.query_vectors:
+                raise ValueError("query_vectors must not be empty")
+            dimensions = len(self.query_vectors[0])
+            for vector in self.query_vectors:
+                require_valid(validate_embedding(vector, expected_dimensions=dimensions))
+        if self.kind == "recommend" and not self.positive_point_ids:
+            raise ValueError("recommend requires at least one positive point id")
+        if self.kind == "discover" and not self.context_point_ids:
+            raise ValueError("discover requires at least one context point id")
+        if self.kind == "lookup" and not self.point_ids:
+            raise ValueError("lookup requires at least one point id")
+        if self.kind == "prefetch" and not self.branches:
+            raise ValueError("prefetch requires at least one branch")
+        if self.weight is not None and (not math.isfinite(self.weight) or self.weight < 0):
+            raise ValueError("weight must be finite and non-negative")
+        for value in (self.min_score, self.max_score):
+            if value is not None and not math.isfinite(value):
+                raise ValueError("score thresholds must be finite")
+        if (
+            self.min_score is not None
+            and self.max_score is not None
+            and self.min_score > self.max_score
+        ):
+            raise ValueError("min_score must not exceed max_score")
+        return self
+
+
+class QueryExecuteRequest(ContextRequest):
+    collection: str
+    plan: ContextQueryPlan
+
+    @field_validator("collection")
+    @classmethod
+    def _query_collection(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("collection must not be blank")
+        return value
+
+
+class QueryExplainRequest(ContextRequest):
+    collection: str
+    text_column: str
+
+    @field_validator("collection")
+    @classmethod
+    def _explain_collection(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("collection must not be blank")
+        return value
+
+    @field_validator("text_column")
+    @classmethod
+    def _explain_column(cls, value: str) -> str:
+        require_valid(validate_identifier(value, field="text_column"))
+        return value
+
+
 class ErrorBody(ContextResponse):
     code: str
     variant: str | None = None
@@ -533,10 +843,22 @@ class RuntimeCapabilities(ContextResponse):
     same_column_bridge: bool = False
 
 
+class PgContextCompatibilityCapabilities(ContextResponse):
+    target_version: Literal["0.2.0"]
+    stable_items: int
+    aligned: int
+    managed_equivalent: int
+    partial: int
+    sql_only: int
+    deferred: int
+    missing_sdk: Literal[0]
+
+
 class CapabilitiesResponse(ContextResponse):
     request_id: str
     contract_version: Literal["context.v1"]
     product_status: Literal["preview"]
+    pgcontext_compatibility: PgContextCompatibilityCapabilities
     runtime: RuntimeCapabilities
     setup: bool
     setup_blocker: str | None
@@ -613,10 +935,18 @@ class DiscoveryVector(ContextResponse):
     nullable: bool
 
 
+class DiscoveryColumn(ContextResponse):
+    column_name: str
+    data_type: str
+    nullable: bool
+    ordinal_position: int
+
+
 class DiscoveryCandidate(ContextResponse):
     classification: ContextSourceClassification | str
     source: DiscoverySource
     vectors: list[DiscoveryVector]
+    columns: list[DiscoveryColumn] = Field(default_factory=list)
     reasons: list[DiscoveryReason]
 
 
@@ -746,6 +1076,82 @@ class CollectionGetResponse(ContextResponse):
     request_id: str
     collection: ContextCollection
     deletion_plan: DeletionPlan
+
+
+class CollectionAlias(ContextResponse):
+    alias_name: str
+    collection_name: str
+
+
+class CollectionAliasResponse(ContextResponse):
+    request_id: str
+    alias: CollectionAlias
+
+
+class CollectionAliasListResponse(ContextResponse):
+    request_id: str
+    aliases: list[CollectionAlias]
+
+
+class CollectionAliasDropResponse(ContextResponse):
+    request_id: str
+    alias_name: str
+    dropped: bool
+
+
+class PgContextCollectionInfo(ContextResponse):
+    collection_id: int = Field(gt=0)
+    collection_name: str
+    owner_name: str
+    table_schema: str | None
+    table_name: str | None
+
+
+class PgContextCollectionInfoResponse(ContextResponse):
+    request_id: str
+    collection: PgContextCollectionInfo
+
+
+class CollectionLimits(ContextResponse):
+    strict_mode: bool
+    max_dimensions: int | None
+    max_vectors: int | None
+    max_points: int | None
+    max_filter_nodes: int | None
+    max_search_limit: int | None
+    max_candidate_budget: int | None
+    query_timeout_ms: int | None
+    max_index_memory_bytes: int | None
+
+
+class CollectionLimitsResponse(ContextResponse):
+    request_id: str
+    collection_name: str
+    limits: CollectionLimits
+
+
+class PgContextVectorMetadata(ContextResponse):
+    collection_name: str
+    vector_name: str
+    table_schema: str
+    table_name: str
+    vector_column: str
+    dimensions: int = Field(ge=1, le=16_000)
+    metric: str
+    hnsw_options: dict[str, Any]
+    quantization_options: dict[str, Any]
+    status: str
+
+
+class CollectionVectorsResponse(ContextResponse):
+    request_id: str
+    collection_name: str
+    vectors: list[PgContextVectorMetadata]
+
+
+class VectorConfigureResponse(ContextResponse):
+    request_id: str
+    vector: PgContextVectorMetadata
 
 
 class ContextOperationFailure(ContextResponse):
@@ -888,6 +1294,247 @@ class PointMutationResponse(ContextResponse):
     already_active: int
     deleted: int
     already_absent: int
+
+
+class PointBatchProgress(ContextResponse):
+    batch_number: int
+    processed_count: int
+    inserted_count: int | None = None
+    reactivated_count: int | None = None
+    deleted_count: int | None = None
+    missing_count: int | None = None
+
+
+class PointBatchResponse(ContextResponse):
+    request_id: str
+    batches: list[PointBatchProgress]
+
+
+class PayloadMutationResult(ContextResponse):
+    source_key: str
+    updated: bool
+
+
+class PayloadMutationResponse(ContextResponse):
+    request_id: str
+    results: list[PayloadMutationResult]
+
+
+class PgContextScoredPoint(ContextResponse):
+    point_id: int
+    source_key: str
+    score: float
+
+
+class PgContextScoredResponse(ContextResponse):
+    request_id: str
+    results: list[PgContextScoredPoint]
+
+
+class IndexStatusRow(ContextResponse):
+    index_schema: str
+    index_name: str
+    table_schema: str
+    table_name: str
+    access_method: str
+    is_valid: bool
+    is_ready: bool
+    is_live: bool
+    status: str
+
+
+class IndexDiagnosticsRow(ContextResponse):
+    index_schema: str
+    index_name: str
+    table_schema: str
+    table_name: str
+    access_method: str
+    status: str
+    context_error: str | None
+    sqlstate: str | None
+    repair_advice: str
+
+
+class IndexMemoryEstimateRow(ContextResponse):
+    index_schema: str
+    index_name: str
+    table_schema: str
+    table_name: str
+    access_method: str
+    estimated_rows: int
+    dimensions: int
+    vector_bytes: int
+    link_bytes: int
+    total_bytes: int
+    status: str
+
+
+class IndexAdvisorRow(ContextResponse):
+    collection_name: str
+    filter_key: str | None
+    column_name: str | None
+    recommendation: str
+    detail: str
+    suggested_sql: str | None
+
+
+class OptimizationStatusRow(ContextResponse):
+    collection_name: str
+    table_schema: str | None
+    table_name: str | None
+    has_source_table: bool
+    source_table_exists: bool
+    registered_vectors: int
+    active_points: int
+    filter_fields: int
+    hnsw_indexes: int
+    status: str
+
+
+class VacuumAdviceRow(ContextResponse):
+    index_schema: str
+    index_name: str
+    table_schema: str
+    table_name: str
+    access_method: str
+    estimated_index_tuples: int
+    index_pages: int
+    dead_table_tuples: int
+    status: str
+
+
+class TelemetryRow(ContextResponse):
+    collection_name: str
+    table_schema: str | None
+    table_name: str | None
+    has_source_table: bool
+    source_table_exists: bool
+    registered_vectors: int
+    active_points: int
+    deleted_points: int
+    filter_fields: int
+    hnsw_indexes: int
+    status: str
+
+
+class ModelVersionRow(ContextResponse):
+    collection_name: str
+    model_name: str
+    model_version: str
+    dimensions: int
+    metric: str
+    is_active: bool
+
+
+class EmbeddingMigrationRow(ContextResponse):
+    migration_id: int
+    collection_name: str
+    source_model: str
+    source_version: str
+    target_model: str
+    target_version: str
+    status: str
+    total_points: int
+    processed_points: int
+
+
+class RawVectorSearchResult(ContextResponse):
+    point_id: int
+    score: float
+
+
+class RawVectorSearchResponse(ContextResponse):
+    request_id: str
+    results: list[RawVectorSearchResult]
+
+
+class QueryCohortStatsRow(ContextResponse):
+    collection_name: str
+    cohort: str
+    query_kind: str
+    query_count: int
+    total_results: int
+    total_candidates: int | None
+    total_rows_rechecked: int
+    total_rows_pruned: int
+    avg_recall_threshold: float | None
+    avg_recall_achieved: float | None
+    latency_bucket: str
+    lifecycle_state: str
+    avg_latency_ms: float
+    status: str
+
+
+class QueryExecutionStatsRow(ContextResponse):
+    collection_name: str
+    query_kind: str
+    strategy: str
+    query_count: int
+    total_visits: int
+    total_filter_candidates: int
+    total_candidates: int
+    total_rechecks: int
+    total_stages: int
+    total_expansions: int
+    completion: str
+    latency_bucket: str
+    lifecycle_state: str
+    avg_latency_ms: float
+
+
+class QueryCohortStatsResponse(ContextResponse):
+    request_id: str
+    rows: list[QueryCohortStatsRow]
+
+
+class QueryExecutionStatsResponse(ContextResponse):
+    request_id: str
+    rows: list[QueryExecutionStatsRow]
+
+
+class IndexStatusResponse(ContextResponse):
+    request_id: str
+    rows: list[IndexStatusRow]
+
+
+class IndexDiagnosticsResponse(ContextResponse):
+    request_id: str
+    rows: list[IndexDiagnosticsRow]
+
+
+class IndexMemoryEstimateResponse(ContextResponse):
+    request_id: str
+    rows: list[IndexMemoryEstimateRow]
+
+
+class IndexAdvisorResponse(ContextResponse):
+    request_id: str
+    rows: list[IndexAdvisorRow]
+
+
+class OptimizationStatusResponse(ContextResponse):
+    request_id: str
+    rows: list[OptimizationStatusRow]
+
+
+class VacuumAdviceResponse(ContextResponse):
+    request_id: str
+    rows: list[VacuumAdviceRow]
+
+
+class TelemetryResponse(ContextResponse):
+    request_id: str
+    rows: list[TelemetryRow]
+
+
+class ModelVersionsResponse(ContextResponse):
+    request_id: str
+    rows: list[ModelVersionRow]
+
+
+class EmbeddingMigrationsResponse(ContextResponse):
+    request_id: str
+    rows: list[EmbeddingMigrationRow]
 
 
 class CountResponse(ContextResponse):
@@ -1113,6 +1760,41 @@ class RankedResponse(ContextResponse):
     warnings: list[ContextWarning]
 
 
+class QueryExecutionResult(ContextResponse):
+    point_id: int = Field(gt=0)
+    source_key: str
+    score: float
+
+    @field_validator("score")
+    @classmethod
+    def _query_score(cls, value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("score must be finite")
+        return value
+
+
+class QueryExecutionResponse(ContextResponse):
+    request_id: str
+    collection: RankedCollection
+    results: list[QueryExecutionResult]
+
+
+class QueryExplainRow(ContextResponse):
+    stage: str
+    detail: str
+    branch: str | None
+    strategy: str
+    status: str
+    estimated_candidates: int | None
+    candidate_budget: int | None
+
+
+class QueryExplainResponse(ContextResponse):
+    request_id: str
+    collection: RankedCollection
+    rows: list[QueryExplainRow]
+
+
 class ContextJointResponse(ContextResponse):
     request_id: str
     collection: RankedCollection
@@ -1146,12 +1828,27 @@ REQUEST_MODEL_TYPES = (
     CollectionSetDefaultRequest,
     CollectionUpdateRequest,
     CollectionDeleteRequest,
+    CollectionAliasRequest,
+    CollectionLimitsRequest,
+    VectorConfigureRequest,
     FilterColumnRequest,
     FilterJsonbPathRequest,
     PointKeysRequest,
+    BulkPointKeysRequest,
+    BackfillPointsRequest,
+    SetPayloadRequest,
+    DeletePayloadRequest,
+    ClearPayloadRequest,
     CountRequest,
     FacetsRequest,
     DenseSearchRequest,
+    CandidateSearchRequest,
+    RecommendRequest,
+    ContextPointDiscoveryRequest,
+    RegisterModelVersionRequest,
+    CreateEmbeddingMigrationRequest,
+    UpdateEmbeddingMigrationRequest,
+    RawVectorSearchRequest,
     GroupedSearchRequest,
     RecallCheckRequest,
     TextHybridSearchRequest,
@@ -1162,6 +1859,9 @@ REQUEST_MODEL_TYPES = (
     RankFusionSearchRequest,
     JointWeights,
     JointSearchRequest,
+    ContextQueryPlan,
+    QueryExecuteRequest,
+    QueryExplainRequest,
 )
 
 RESPONSE_MODEL_TYPES = (
@@ -1173,6 +1873,13 @@ RESPONSE_MODEL_TYPES = (
     ContextCollection,
     CollectionListResponse,
     CollectionGetResponse,
+    CollectionAliasResponse,
+    CollectionAliasListResponse,
+    CollectionAliasDropResponse,
+    PgContextCollectionInfoResponse,
+    CollectionLimitsResponse,
+    CollectionVectorsResponse,
+    VectorConfigureResponse,
     CollectionStatusResponse,
     VerificationResponse,
     DiagnosticsResponse,
@@ -1180,12 +1887,29 @@ RESPONSE_MODEL_TYPES = (
     PointStatusResponse,
     PointScrollResponse,
     PointMutationResponse,
+    PointBatchResponse,
+    PayloadMutationResponse,
+    PgContextScoredResponse,
+    IndexStatusResponse,
+    IndexDiagnosticsResponse,
+    IndexMemoryEstimateResponse,
+    IndexAdvisorResponse,
+    OptimizationStatusResponse,
+    VacuumAdviceResponse,
+    TelemetryResponse,
+    ModelVersionsResponse,
+    EmbeddingMigrationsResponse,
+    RawVectorSearchResponse,
+    QueryCohortStatsResponse,
+    QueryExecutionStatsResponse,
     ContextOperation,
     OperationEnvelope,
     OperationListResponse,
     CountResponse,
     FacetsResponse,
     RankedResponse,
+    QueryExecutionResponse,
+    QueryExplainResponse,
     LexicalLane,
     JointGraphLane,
     JointScoreBreakdown,
@@ -1199,9 +1923,11 @@ RESPONSE_MODEL_TYPES = (
 
 NESTED_RESPONSE_MODEL_TYPES = (
     RuntimeCapabilities,
+    PgContextCompatibilityCapabilities,
     DiscoveryReason,
     DiscoverySource,
     DiscoveryVector,
+    DiscoveryColumn,
     DiscoveryCandidate,
     ContextOnboardingCandidate,
     PreflightCheck,
@@ -1209,12 +1935,31 @@ NESTED_RESPONSE_MODEL_TYPES = (
     PreflightOwnership,
     ContextCollectionVector,
     DeletionPlan,
+    CollectionAlias,
+    PgContextCollectionInfo,
+    CollectionLimits,
+    PgContextVectorMetadata,
     ContextOperationFailure,
     VerificationCheck,
     DiagnosticCheck,
     RecommendedAction,
     FilterRegistration,
     PointMapping,
+    PointBatchProgress,
+    PayloadMutationResult,
+    PgContextScoredPoint,
+    IndexStatusRow,
+    IndexDiagnosticsRow,
+    IndexMemoryEstimateRow,
+    IndexAdvisorRow,
+    OptimizationStatusRow,
+    VacuumAdviceRow,
+    TelemetryRow,
+    ModelVersionRow,
+    EmbeddingMigrationRow,
+    RawVectorSearchResult,
+    QueryCohortStatsRow,
+    QueryExecutionStatsRow,
     FacetValue,
     ContextSourceIdentity,
     ContextLane,
@@ -1226,6 +1971,8 @@ NESTED_RESPONSE_MODEL_TYPES = (
     ContextGraphHybridResult,
     ContextWarning,
     RankedCollection,
+    QueryExecutionResult,
+    QueryExplainRow,
 )
 
 PUBLIC_MODEL_TYPES = REQUEST_MODEL_TYPES + RESPONSE_MODEL_TYPES + NESTED_RESPONSE_MODEL_TYPES

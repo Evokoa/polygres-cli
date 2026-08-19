@@ -233,6 +233,7 @@ class RuntimeScope(str, Enum):
     HYBRID_READ = "hybrid:read"
     CONTEXT_READ = "context:read"
     CONTEXT_MANAGE = "context:manage"
+    ROWS_READ = "rows:read"
     ROWS_WRITE = "rows:write"
 
 
@@ -242,8 +243,23 @@ class RuntimeClientKind(str, Enum):
     GATEWAY_SYSTEM = "gateway_system"
 
 
+class ProjectType(str, Enum):
+    """Create-request discriminator; it is never persisted as authorization state."""
+
+    STANDARD = "standard"
+    POSTGRES_SYNC = "postgres_sync"
+
+
+class ProjectMode(str, Enum):
+    """The authoritative persisted customer-access mode for a project."""
+
+    STANDARD = "standard"
+    SYNCED = "synced"
+
+
 class ProjectApiKeyScope(str, Enum):
     PROJECT_FULL = "project_full"
+    SYNCED_PROJECT = "synced_project"
 
 
 class PermissionCheckKind(str, Enum):
@@ -276,6 +292,7 @@ class JwtAlgorithm(str, Enum):
 
 class ProjectStatus(str, Enum):
     PROVISIONING = "provisioning"
+    SYNCING = "syncing"
     READY = "ready"
     FAILED = "failed"
     DELETING = "deleting"
@@ -367,6 +384,7 @@ class PolicyId(str, Enum):
     PROJECT_PERMISSION = "project_permission"
     PROJECT_API_KEY = "project_api_key"
     GATEWAY_RUNTIME = "gateway_runtime"
+    RUNTIME_ROW_READ = "runtime_row_read"
     RUNTIME_ROW_WRITE = "runtime_row_write"
     CLI_FLOW = "cli_flow"
     RECOVERY_SESSION = "recovery_session"

@@ -16,6 +16,7 @@ from .enums import (
     Permission,
     PrincipalKind,
     ProjectApiKeyScope,
+    ProjectMode,
     ProjectStatus,
     RateLimitIdentityKind,
     RuntimeClientKind,
@@ -120,6 +121,7 @@ class ProjectAccessRecord:
     organization_id: UUID | None
     owner_subject_id: UUID | None
     status: ProjectStatus
+    project_mode: ProjectMode = ProjectMode.STANDARD
 
 
 @dataclass(frozen=True, slots=True)
