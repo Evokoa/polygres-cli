@@ -166,12 +166,16 @@ def test_every_high_level_command_has_an_allowlisted_completion_name() -> None:
 
     walk(cli.build_parser(), {})
     contract_path = (
-        Path(__file__).parents[2]
-        / "polygres-lib"
-        / "contracts"
-        / "observability"
-        / "product-events.json"
+        Path(__file__).parent / "fixtures" / "observability" / "product-events.json"
     )
+    if not contract_path.exists():
+        contract_path = (
+            Path(__file__).parents[2]
+            / "polygres-lib"
+            / "contracts"
+            / "observability"
+            / "product-events.json"
+        )
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
     event = next(item for item in contract["events"] if item["name"] == "cli command completed")
     allowlist = set(event["properties"]["cli_command"]["values"])

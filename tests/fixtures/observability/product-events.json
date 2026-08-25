@@ -1,0 +1,664 @@
+{
+  "contract_version": "product-events.v3",
+  "envelope": {
+    "properties": {
+      "producer": {
+        "type": "enum",
+        "values": ["dashboard", "control_api", "runtime_api", "postgres_analytics"]
+      },
+      "surface": {
+        "type": "enum",
+        "values": ["dashboard", "cli", "python_sdk", "api", "postgresql"]
+      },
+      "access_method": {
+        "type": "enum",
+        "values": ["dashboard", "dashboard_sql", "cli", "control_api", "runtime_api", "postgresql"]
+      },
+      "identity_state": {
+        "type": "enum",
+        "values": ["authenticated_user", "project", "anonymous", "group"]
+      },
+      "attribution_type": {
+        "type": "enum",
+        "values": ["user_credential", "project_credential", "anonymous", "group_system"]
+      },
+      "project_credential_type": {
+        "type": "enum",
+        "values": ["project_api_key", "postgresql_credentials"],
+        "required_when": { "property": "identity_state", "equals": "project" }
+      },
+      "actor_user_id": {
+        "type": "identifier",
+        "required_when": { "property": "identity_state", "equals": "authenticated_user" }
+      },
+      "outcome": {
+        "type": "enum",
+        "values": ["succeeded", "failed"],
+        "required": false
+      },
+      "error_code": {
+        "type": "error_code",
+        "required_when": { "property": "outcome", "equals": "failed" },
+        "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+      }
+    },
+    "variants": {
+      "cli_user": {
+        "producer": "control_api",
+        "surface": "cli",
+        "access_method": "cli",
+        "identity_state": "authenticated_user",
+        "attribution_type": "user_credential"
+      },
+      "control_api_project": {
+        "producer": "control_api",
+        "surface": "api",
+        "access_method": "control_api",
+        "identity_state": "project",
+        "attribution_type": "project_credential"
+      },
+      "control_dashboard_user": {
+        "producer": "control_api",
+        "surface": "dashboard",
+        "access_method": "dashboard",
+        "identity_state": "authenticated_user",
+        "attribution_type": "user_credential"
+      },
+      "dashboard_anonymous": {
+        "producer": "dashboard",
+        "surface": "dashboard",
+        "access_method": "dashboard",
+        "identity_state": "anonymous",
+        "attribution_type": "anonymous"
+      },
+      "dashboard_sql_user": {
+        "producer": "control_api",
+        "surface": "dashboard",
+        "access_method": "dashboard_sql",
+        "identity_state": "authenticated_user",
+        "attribution_type": "user_credential"
+      },
+      "dashboard_user": {
+        "producer": "dashboard",
+        "surface": "dashboard",
+        "access_method": "dashboard",
+        "identity_state": "authenticated_user",
+        "attribution_type": "user_credential"
+      },
+      "postgresql_project": {
+        "producer": "postgres_analytics",
+        "surface": "postgresql",
+        "access_method": "postgresql",
+        "identity_state": "project",
+        "attribution_type": "project_credential"
+      },
+      "python_sdk_project": {
+        "producer": "runtime_api",
+        "surface": "python_sdk",
+        "access_method": "runtime_api",
+        "identity_state": "project",
+        "attribution_type": "project_credential"
+      },
+      "runtime_api_project": {
+        "producer": "runtime_api",
+        "surface": "api",
+        "access_method": "runtime_api",
+        "identity_state": "project",
+        "attribution_type": "project_credential"
+      }
+    }
+  },
+  "event_envelopes": {
+    "agent setup prompt copied": ["dashboard_user"],
+    "auth account setup completed": ["control_dashboard_user"],
+    "auth oauth initiation failed": ["dashboard_anonymous"],
+    "auth oauth started": ["dashboard_anonymous"],
+    "cli command completed": ["cli_user"],
+    "connection instructions copied": ["dashboard_user"],
+    "connection instructions viewed": ["dashboard_user"],
+    "control api request completed": ["control_api_project"],
+    "import cancelled": ["control_dashboard_user"],
+    "import completed": ["control_dashboard_user"],
+    "import preview completed": ["dashboard_user"],
+    "import started": ["dashboard_user"],
+    "organization invite sent": ["dashboard_user"],
+    "postgresql connection completed": ["postgresql_project"],
+    "project creation requested": ["dashboard_user"],
+    "project provisioning completed": ["control_dashboard_user"],
+    "project provisioning retry requested": ["dashboard_user"],
+    "retrieval became ready": ["control_dashboard_user"],
+    "retrieval build requested": ["dashboard_user"],
+    "retrieval configured": ["dashboard_user"],
+    "retrieval discovery completed": ["dashboard_user"],
+    "retrieval query executed": ["dashboard_user"],
+    "roadmap suggestion submitted": ["dashboard_user"],
+    "runtime api request completed": ["runtime_api_project", "python_sdk_project"],
+    "sql query executed": ["dashboard_sql_user", "postgresql_project"],
+    "user visible error shown": ["dashboard_user"]
+  },
+  "events": [
+    {
+      "name": "agent setup prompt copied",
+      "properties": { "project_id": { "type": "identifier" } }
+    },
+    { "name": "auth account setup completed", "properties": {} },
+    {
+      "name": "auth oauth initiation failed",
+      "properties": {
+        "provider": { "type": "enum", "values": ["google", "github"] }
+      }
+    },
+    {
+      "name": "auth oauth started",
+      "properties": {
+        "provider": { "type": "enum", "values": ["google", "github"] },
+        "tab": { "type": "enum", "values": ["login", "signup"] }
+      }
+    },
+    {
+      "name": "cli command completed",
+      "properties": {
+        "cli_command_id": { "type": "identifier" },
+        "cli_command": {
+          "type": "enum",
+          "values": [
+            "login",
+            "logout",
+            "whoami",
+            "projects.list",
+            "projects.use",
+            "projects.create.standard",
+            "projects.create.sync",
+            "projects.status",
+            "env",
+            "db.info",
+            "db.psql",
+            "keys.create",
+            "keys.list",
+            "keys.revoke",
+            "import.csv",
+            "import.status",
+            "migrations.list",
+            "migrations.apply",
+            "graph.discover",
+            "graph.config.export",
+            "graph.config.apply",
+            "graph.build",
+            "graph.status",
+            "vector.configs.list",
+            "vector.configs.create",
+            "vector.configs.delete",
+            "vector.configs.set-default",
+            "vector.reindex",
+            "text.configs.list",
+            "text.configs.get",
+            "text.configs.create-tsvector",
+            "text.configs.create-fuzzy",
+            "text.configs.update",
+            "text.configs.diagnostics",
+            "text.configs.reindex",
+            "text.configs.delete",
+            "ready",
+            "notices",
+            "api.routes",
+            "api.request",
+            "context.capabilities",
+            "context.init",
+            "context.sources.discover",
+            "context.sources.preflight",
+            "context.collections.list",
+            "context.collections.get",
+            "context.collections.status",
+            "context.collections.verify",
+            "context.collections.create",
+            "context.collections.update",
+            "context.collections.set-default",
+            "context.collections.diagnostics",
+            "context.collections.reindex",
+            "context.collections.delete",
+            "context.filters.list",
+            "context.filters.add-column",
+            "context.filters.add-jsonb-path",
+            "context.points.upsert",
+            "context.points.delete",
+            "context.points.status",
+            "context.points.reconcile",
+            "context.points.scroll",
+            "context.operations.list",
+            "context.operations.get",
+            "context.operations.wait",
+            "context.operations.cancel",
+            "context.operations.retry",
+            "context.count",
+            "context.facets",
+            "context.search",
+            "context.text-hybrid",
+            "context.graph-first",
+            "context.vector-first",
+            "context.rank-fusion",
+            "context.joint",
+            "context.grouped-search",
+            "context.recall-check",
+            "rows.validate",
+            "rows.insert",
+            "rows.upsert",
+            "rows.ignore",
+            "config.path"
+          ]
+        },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        },
+        "polygres_cli_version": { "type": "string", "min_length": 1, "max_length": 64 },
+        "project_id": { "type": "identifier", "required": false },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "connection instructions copied",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "connection_method": {
+          "type": "enum",
+          "values": ["cli", "api", "database", "examples"]
+        },
+        "artifact_type": {
+          "type": "enum",
+          "values": [
+            "cli_install",
+            "cli_login",
+            "cli_project_select",
+            "pooled_connection",
+            "direct_connection",
+            "environment_file",
+            "sdk_example",
+            "api_key_command"
+          ]
+        }
+      }
+    },
+    {
+      "name": "connection instructions viewed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "connection_method": {
+          "type": "enum",
+          "values": ["cli", "api", "database", "examples"]
+        }
+      }
+    },
+    {
+      "name": "control api request completed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "action": { "type": "string", "min_length": 1, "max_length": 128 },
+        "product_area": { "type": "string", "min_length": 1, "max_length": 128 },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "import cancelled",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "import_type": { "type": "enum", "values": ["csv", "sql", "pg_dump"] },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        }
+      }
+    },
+    {
+      "name": "import completed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "import_type": { "type": "enum", "values": ["csv", "sql", "pg_dump"] },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "import preview completed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "mode": {
+          "type": "enum",
+          "values": ["create_table", "append_existing"]
+        },
+        "size_bucket": {
+          "type": "enum",
+          "values": ["<1MB", "1-10MB", "10-100MB", "100MB-1GB", "1GB+"]
+        },
+        "column_count_bucket": {
+          "type": "enum",
+          "values": ["1-5", "6-20", "21-50", "51+"]
+        },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "import started",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "import_type": { "type": "enum", "values": ["csv", "sql", "pg_dump"] },
+        "size_bucket": {
+          "type": "enum",
+          "values": ["<1MB", "1-10MB", "10-100MB", "100MB-1GB", "1GB+"]
+        }
+      }
+    },
+    {
+      "name": "organization invite sent",
+      "properties": {
+        "role": { "type": "enum", "values": ["admin", "developer", "viewer"] }
+      }
+    },
+    {
+      "name": "postgresql connection completed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "database_client": { "type": "string", "min_length": 1, "max_length": 128 },
+        "database_connection_method": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "project creation requested",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "tier_id": { "type": "identifier", "required": false }
+      }
+    },
+    {
+      "name": "project provisioning completed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        },
+        "failure_stage": {
+          "type": "enum",
+          "values": ["project", "database", "pooler", "unknown"],
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "project provisioning retry requested",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "previous_failure_stage": {
+          "type": "enum",
+          "values": ["project", "database", "pooler", "unknown"]
+        }
+      }
+    },
+    {
+      "name": "retrieval became ready",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "retrieval_type": {
+          "type": "enum",
+          "values": ["text", "vector", "graph"]
+        },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        }
+      }
+    },
+    {
+      "name": "retrieval build requested",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "retrieval_type": { "type": "enum", "values": ["vector", "graph"] },
+        "build_kind": {
+          "type": "enum",
+          "values": ["initial", "rebuild", "reindex"]
+        }
+      }
+    },
+    {
+      "name": "retrieval configured",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "retrieval_type": {
+          "type": "enum",
+          "values": ["text", "vector", "graph"]
+        },
+        "action": {
+          "type": "enum",
+          "values": ["created", "updated", "deleted"]
+        }
+      }
+    },
+    {
+      "name": "retrieval discovery completed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "retrieval_type": {
+          "type": "enum",
+          "values": ["text", "vector", "graph"]
+        },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        },
+        "candidate_count_bucket": {
+          "type": "enum",
+          "values": ["0", "1-10", "11-100", "101-1000", "1001+"],
+          "required_when": { "property": "outcome", "equals": "succeeded" },
+          "forbidden_when": { "property": "outcome", "equals": "failed" }
+        },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "retrieval query executed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "query_surface": { "type": "enum", "values": ["playground"] },
+        "method": {
+          "type": "enum",
+          "values": [
+            "vector_search",
+            "vector_similar_to",
+            "graph_expand",
+            "graph_neighborhood",
+            "graph_related",
+            "graph_path",
+            "graph_connection",
+            "hybrid_graph_first",
+            "hybrid_vector_first",
+            "hybrid_joint"
+          ]
+        },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        },
+        "result_count_bucket": {
+          "type": "enum",
+          "values": ["0", "1-10", "11-100", "101-1000", "1001+"],
+          "required_when": { "property": "outcome", "equals": "succeeded" },
+          "forbidden_when": { "property": "outcome", "equals": "failed" }
+        },
+        "has_more": {
+          "type": "boolean",
+          "required_when": { "property": "outcome", "equals": "succeeded" },
+          "forbidden_when": { "property": "outcome", "equals": "failed" }
+        },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "roadmap suggestion submitted",
+      "properties": {
+        "category": { "type": "string", "min_length": 1, "max_length": 128 }
+      }
+    },
+    {
+      "name": "runtime api request completed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "action": { "type": "string", "min_length": 1, "max_length": 128 },
+        "product_area": { "type": "string", "min_length": 1, "max_length": 128 },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        }
+      }
+    },
+    {
+      "name": "sql query executed",
+      "properties": {
+        "project_id": { "type": "identifier" },
+        "outcome": { "type": "enum", "values": ["succeeded", "failed"] },
+        "operation_type": {
+          "type": "enum",
+          "values": [
+            "select",
+            "insert",
+            "update",
+            "delete",
+            "create",
+            "alter",
+            "drop",
+            "truncate",
+            "with",
+            "explain",
+            "copy",
+            "call",
+            "do",
+            "begin",
+            "commit",
+            "rollback",
+            "unknown"
+          ]
+        },
+        "duration_bucket": {
+          "type": "enum",
+          "values": ["<1s", "1s-5s", "5s-30s", "30s-2m", "2m+", "unknown"]
+        },
+        "error_code": {
+          "type": "error_code",
+          "required_when": { "property": "outcome", "equals": "failed" },
+          "forbidden_when": { "property": "outcome", "equals": "succeeded" }
+        },
+        "database_error_code": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64,
+          "required": false
+        }
+      }
+    },
+    {
+      "name": "user visible error shown",
+      "properties": {
+        "error_code": {
+          "type": "enum",
+          "values": [
+            "AUTH_NOT_CONFIGURED",
+            "CONTROL_PLANE_NOT_CONFIGURED",
+            "CONTROL_PLANE_UNAVAILABLE",
+            "CONTROL_PLANE_ERROR",
+            "INVITATION_DELIVERY_FAILED",
+            "EMAIL_VERIFICATION_LINK_FAILED"
+          ]
+        },
+        "error_family": {
+          "type": "enum",
+          "values": [
+            "authentication",
+            "control_plane",
+            "organization_invitation",
+            "email_verification"
+          ]
+        },
+        "error_operation": {
+          "type": "enum",
+          "values": [
+            "configuration",
+            "availability",
+            "request",
+            "delivery",
+            "link_generation"
+          ]
+        },
+        "error_location": {
+          "type": "enum",
+          "values": [
+            "account",
+            "auth_configuration",
+            "email_verification",
+            "gateway",
+            "invitation_acceptance",
+            "organization_invitation",
+            "route_error"
+          ]
+        }
+      }
+    }
+  ]
+}
