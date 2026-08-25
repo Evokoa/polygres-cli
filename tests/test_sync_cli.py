@@ -253,6 +253,7 @@ def test_sync_create_orchestrates_inspection_selection_and_project_creation(
     }
     create_body = json.loads(create_route.calls.last.request.content)
     assert create_body["project_type"] == "postgres_sync"
+    assert create_body["selected_data_source"] == "postgres"
     assert create_body["preflight_attempt_id"] == ATTEMPT_ID
     assert create_body["expected_selection_generation"] == 1
     assert create_body["confirmations"] == {

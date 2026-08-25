@@ -4,6 +4,19 @@ All notable changes to `polygres-cli` are documented in this file.
 
 ## Unreleased
 
+## 0.4.1 - 2026-08-25
+
+### Changed
+
+- Human-readable durable Context operation failures now include the stable
+  error code, failure stage, and operation ID when those recovery fields are
+  available.
+
+### Fixed
+
+- Updated the bundled public error catalog for actionable collection sync,
+  timeout, connection, memory, storage, and index failures.
+
 ## 0.4.0 - 2026-08-19
 
 ### Added

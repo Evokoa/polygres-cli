@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -79,9 +80,7 @@ def _stub_csv_direct_preview(
         ),
     )
     block_route = _stub(
-        respx.put(
-            re.compile(r"https://blob\.example\.test/file\.csv\?.*comp=block&blockid=.*")
-        ),
+        respx.put(re.compile(r"https://blob\.example\.test/file\.csv\?.*comp=block&blockid=.*")),
         return_value=httpx.Response(201),
     )
     commit_route = _stub(
@@ -90,8 +89,7 @@ def _stub_csv_direct_preview(
     )
     complete_route = _stub(
         respx.post(
-            f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/upload-sessions/"
-            f"{IMPORT_ID}/complete"
+            f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/upload-sessions/{IMPORT_ID}/complete"
         ),
         return_value=httpx.Response(200, json=preview),
     )
@@ -149,6 +147,36 @@ def test_help_lists_launch_commands_and_hides_no_extra_text_reindex(
     assert "login" in out
     assert "logout" in out
     assert "text reindex" not in out
+
+
+def test_every_high_level_command_has_an_allowlisted_completion_name() -> None:
+    discovered: set[str] = set()
+
+    def walk(parser: argparse.ArgumentParser, values: dict[str, str]) -> None:
+        subparsers = [
+            action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
+        ]
+        if not subparsers:
+            if parser.get_default("func") is not None:
+                discovered.add(cli._command_name(argparse.Namespace(**values)))
+            return
+        for action in subparsers:
+            for choice, child in action.choices.items():
+                walk(child, {**values, action.dest: choice})
+
+    walk(cli.build_parser(), {})
+    contract_path = (
+        Path(__file__).parents[2]
+        / "polygres-lib"
+        / "contracts"
+        / "observability"
+        / "product-events.json"
+    )
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    event = next(item for item in contract["events"] if item["name"] == "cli command completed")
+    allowlist = set(event["properties"]["cli_command"]["values"])
+
+    assert discovered == allowlist
 
 
 def test_version_and_config_path_json(
@@ -590,9 +618,7 @@ def test_projects_create_reports_created_project_when_status_poll_times_out(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    def poll_timeout(
-        _ctx: cli.Context, _project_id: str, *, deadline: float
-    ) -> dict[str, object]:
+    def poll_timeout(_ctx: cli.Context, _project_id: str, *, deadline: float) -> dict[str, object]:
         assert deadline > 0
         raise cli.CliError(
             "TIMEOUT",
@@ -1875,9 +1901,7 @@ def test_vector_create_directs_users_to_pgcontext_without_calling_api(
         "replacement": "pgcontext_collection",
         "command": "polygres context collections create",
         "upgrade_command": "pipx upgrade polygres-cli",
-        "documentation_url": (
-            "https://docs.evokoa.com/polygres/cli/context#collection-lifecycle"
-        ),
+        "documentation_url": ("https://docs.evokoa.com/polygres/cli/context#collection-lifecycle"),
     }
     assert "pipx upgrade polygres-cli" in payload["error"]["message"]
     assert "`polygres context collections create`" in payload["error"]["message"]
@@ -2270,9 +2294,7 @@ def test_import_status_fails_closed_for_unknown_status(
         ),
     )
 
-    rc, out, err = run_cli(
-        ["--json", "import", "status", IMPORT_ID], capsys, monkeypatch, tmp_path
-    )
+    rc, out, err = run_cli(["--json", "import", "status", IMPORT_ID], capsys, monkeypatch, tmp_path)
 
     assert rc == 1
     assert err == ""
@@ -2355,9 +2377,7 @@ def test_failed_import_json_output_shape_is_preserved(
         ),
     )
 
-    rc, out, err = run_cli(
-        ["--json", "import", "status", IMPORT_ID], capsys, monkeypatch, tmp_path
-    )
+    rc, out, err = run_cli(["--json", "import", "status", IMPORT_ID], capsys, monkeypatch, tmp_path)
 
     assert rc == 1
     assert err == ""
@@ -2485,11 +2505,7 @@ def test_login_browser_fallback_polls_stores_tokens_and_redacts_output(
         {"unknown": []},
         {"registered_tables": {}},
         {"registered_tables": [{"table": "documents"}]},
-        {
-            "registered_tables": [
-                {"table": "documents", "id_column": "id", "unexpected": True}
-            ]
-        },
+        {"registered_tables": [{"table": "documents", "id_column": "id", "unexpected": True}]},
         {
             "registered_relationships": [
                 {
@@ -2553,9 +2569,7 @@ def test_csv_import_propagates_preview_effective_parser_settings(
     )
     import_route = _stub(
         respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"),
-        return_value=httpx.Response(
-            200, json={"import": {"id": IMPORT_ID, "status": "succeeded"}}
-        ),
+        return_value=httpx.Response(200, json={"import": {"id": IMPORT_ID, "status": "succeeded"}}),
     )
 
     rc, _, _ = run_cli(
@@ -2602,9 +2616,7 @@ def test_quiet_suppresses_human_primary_output(
         return_value=httpx.Response(200, json={"projects": []}),
     )
 
-    rc, out, err = run_cli(
-        ["--quiet", "projects", "list"], capsys, monkeypatch, tmp_path
-    )
+    rc, out, err = run_cli(["--quiet", "projects", "list"], capsys, monkeypatch, tmp_path)
 
     assert rc == 0
     assert out == ""
@@ -2705,9 +2717,7 @@ def test_human_import_polling_writes_progress_only_to_stderr(
     path = tmp_path / "documents.csv"
     path.write_text("id\n1\n", encoding="utf-8")
     monkeypatch.setattr(cli.time, "sleep", lambda _seconds: None)
-    _stub_csv_direct_preview(
-        {"preview": {"job_id": IMPORT_ID, "columns": [{"name": "id"}]}}
-    )
+    _stub_csv_direct_preview({"preview": {"job_id": IMPORT_ID, "columns": [{"name": "id"}]}})
     _stub(
         respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv"),
         return_value=httpx.Response(
@@ -2720,9 +2730,7 @@ def test_human_import_polling_writes_progress_only_to_stderr(
     )
     _stub(
         respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/{IMPORT_ID}"),
-        return_value=httpx.Response(
-            200, json={"import": {"id": IMPORT_ID, "status": "succeeded"}}
-        ),
+        return_value=httpx.Response(200, json={"import": {"id": IMPORT_ID, "status": "succeeded"}}),
     )
 
     rc, out, err = run_cli(
@@ -3315,8 +3323,7 @@ def test_env_removes_backend_password_placeholder_in_human_and_json_output(
         "direct": {
             "host": "direct.example.test",
             "connection_string_without_password": (
-                "postgresql://project_owner:<password>@direct.example.test:5432/app"
-                "?sslmode=require"
+                "postgresql://project_owner:<password>@direct.example.test:5432/app?sslmode=require"
             ),
         },
         "pooled": {
@@ -3348,9 +3355,7 @@ def test_env_removes_backend_password_placeholder_in_human_and_json_output(
     assert "<password>" not in human
     assert "[REDACTED]" not in human
     assert "postgresql://project_owner@" in human
-    assert (
-        f"export POLYGRES_RUNTIME_URL=https://{PROJECT_ID}.api.db.polygres.com/v1" in human
-    )
+    assert f"export POLYGRES_RUNTIME_URL=https://{PROJECT_ID}.api.db.polygres.com/v1" in human
 
     rc, machine, err = run_cli(["--json", "env"], capsys, monkeypatch, tmp_path)
     assert rc == 0
@@ -3360,9 +3365,7 @@ def test_env_removes_backend_password_placeholder_in_human_and_json_output(
     assert "<password>" not in rendered
     assert "[REDACTED]" not in rendered
     assert "postgresql://project_owner@" in rendered
-    assert machine_env["POLYGRES_RUNTIME_URL"] == (
-        f"https://{PROJECT_ID}.api.db.polygres.com/v1"
-    )
+    assert machine_env["POLYGRES_RUNTIME_URL"] == (f"https://{PROJECT_ID}.api.db.polygres.com/v1")
 
 
 @ROUTE_CTX
@@ -3380,9 +3383,7 @@ def test_keys_create_rejects_missing_one_time_secret(
         ),
     )
 
-    rc, out, err = run_cli(
-        ["--json", "keys", "create", "local"], capsys, monkeypatch, tmp_path
-    )
+    rc, out, err = run_cli(["--json", "keys", "create", "local"], capsys, monkeypatch, tmp_path)
 
     assert rc == 1
     assert err == ""
@@ -3473,9 +3474,7 @@ def test_quiet_login_prints_essential_fallback_to_stderr_when_browser_fails(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    expires = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat().replace(
-        "+00:00", "Z"
-    )
+    expires = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
     _stub(
         respx.post(f"{API_BASE_URL}/cli/auth/start"),
         return_value=httpx.Response(
@@ -3628,6 +3627,8 @@ def test_heavy_graph_build_request_uses_extended_read_timeout() -> None:
 
     timeout = route.calls[0].request.extensions["timeout"]
     assert timeout["read"] >= 120.0
+
+
 @ROUTE_CTX
 def test_cli_requests_include_command_correlation_headers(
     capsys: pytest.CaptureFixture[str],
@@ -3644,6 +3645,10 @@ def test_cli_requests_include_command_correlation_headers(
             },
         ),
     )
+    completion_route = _stub(
+        respx.post(f"{API_BASE_URL}/cli/analytics/command-completions"),
+        return_value=httpx.Response(202, json={"accepted": True}),
+    )
     rc, _out, _err = run_cli(
         ["--project", PROJECT_ID, "projects", "list"],
         capsys,
@@ -3657,3 +3662,33 @@ def test_cli_requests_include_command_correlation_headers(
     command_id = project_request.headers["x-polygres-command-id"]
     assert cli.UUID_LIKE_RE.fullmatch(command_id)
     assert project_request.headers["x-polygres-command-name"] == "projects.list"
+    assert completion_route.call_count == 1
+    completion = json.loads(completion_route.calls[0].request.content)
+    assert completion["command_id"] == command_id
+    assert completion["command_name"] == "projects.list"
+    assert completion["outcome"] == "succeeded"
+    assert completion["project_id"] == PROJECT_ID
+    assert "error_code" not in completion
+
+
+@ROUTE_CTX
+def test_cli_completion_delivery_failure_does_not_change_command_result(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects"),
+        return_value=httpx.Response(200, json={"request_id": "req-projects", "projects": []}),
+    )
+    completion_route = _stub(
+        respx.post(f"{API_BASE_URL}/cli/analytics/command-completions"),
+        side_effect=httpx.ConnectError("analytics unavailable"),
+    )
+
+    rc, out, err = run_cli(["--json", "projects", "list"], capsys, monkeypatch, tmp_path)
+
+    assert rc == 0
+    assert json.loads(out)["projects"] == []
+    assert err == ""
+    assert completion_route.call_count == 1

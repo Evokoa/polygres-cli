@@ -257,6 +257,16 @@ class ProjectMode(str, Enum):
     SYNCED = "synced"
 
 
+class ProjectDataSource(str, Enum):
+    """The data-source option selected when a project is created."""
+
+    NEON = "neon"
+    SUPABASE = "supabase"
+    PLANETSCALE = "planetscale"
+    POSTGRES = "postgres"
+    POLYGRES = "polygres"
+
+
 class ProjectApiKeyScope(str, Enum):
     PROJECT_FULL = "project_full"
     SYNCED_PROJECT = "synced_project"
@@ -377,6 +387,7 @@ class PolicyId(str, Enum):
     PORTAL_SESSION = "portal_session"
     DASHBOARD_ONLY = "dashboard_only"
     DASHBOARD_OR_CLI = "dashboard_or_cli"
+    CLI_ACCESS_USER = "cli_access_user"
     ACTIVE_ACCOUNT = "active_account"
     ADMIN_OPERATOR = "admin_operator"
     ORGANIZATION_MEMBER = "organization_member"

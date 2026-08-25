@@ -169,7 +169,7 @@ Service and release notices are written to standard error, so standard output an
 
 ## Version and support
 
-Package version: [`0.4.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.4.0).
+Package version: [`0.4.1`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.4.1).
 
 Useful commands:
 
@@ -188,4 +188,4 @@ Users of the former combined `polygres` package should install both packages sep
 
 ## Changelog
 
-See the [CLI 0.4.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.4.0) for release changes.
+See the [CLI 0.4.1 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.4.1) for release changes.

@@ -850,6 +850,68 @@
         "title": "CliAuthStartRequest",
         "type": "object"
       },
+      "CliCommandCompletionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "command_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Command Name",
+            "type": "string"
+          },
+          "duration_ms": {
+            "maximum": 86400000.0,
+            "minimum": 0.0,
+            "title": "Duration Ms",
+            "type": "number"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "outcome": {
+            "enum": [
+              "succeeded",
+              "failed"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "pattern": "^p[a-z0-9]{23}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "command_id",
+          "command_name",
+          "outcome",
+          "duration_ms"
+        ],
+        "title": "CliCommandCompletionRequest",
+        "type": "object"
+      },
       "CliNoticeResponse": {
         "properties": {
           "architectures": {
@@ -7456,6 +7518,17 @@
           "project_type": {
             "$ref": "#/components/schemas/ProjectType",
             "default": "standard"
+          },
+          "selected_data_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectDataSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Defaults to postgres for synchronized PostgreSQL projects and polygres for standard projects."
           }
         },
         "required": [
@@ -7463,6 +7536,18 @@
         ],
         "title": "ProjectCreateRequest",
         "type": "object"
+      },
+      "ProjectDataSource": {
+        "description": "The data-source option selected when a project is created.",
+        "enum": [
+          "neon",
+          "supabase",
+          "planetscale",
+          "postgres",
+          "polygres"
+        ],
+        "title": "ProjectDataSource",
+        "type": "string"
       },
       "ProjectPermissionCheck": {
         "additionalProperties": false,
@@ -8574,6 +8659,44 @@
           "to"
         ],
         "title": "Relationship",
+        "type": "object"
+      },
+      "RetrievalReadyCompletionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_ms": {
+            "anyOf": [
+              {
+                "maximum": 86400000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "operation_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "retrieval_type": {
+            "enum": [
+              "text",
+              "vector",
+              "graph"
+            ],
+            "title": "Retrieval Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "retrieval_type",
+          "operation_id"
+        ],
+        "title": "RetrievalReadyCompletionRequest",
         "type": "object"
       },
       "RoadmapSuggestionCreateRequest": {
@@ -10926,6 +11049,46 @@
         "summary": "Central Check Permissions"
       }
     },
+    "/v1/cli/analytics/command-completions": {
+      "post": {
+        "operationId": "cli_command_complete_v1_cli_analytics_command_completions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CliCommandCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cli Command Complete V1 Cli Analytics Command Completions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cli Command Complete"
+      }
+    },
     "/v1/cli/auth/approve": {
       "post": {
         "operationId": "cli_auth_approve_v1_cli_auth_approve_post",
@@ -12311,6 +12474,57 @@
           }
         },
         "summary": "Rename Project"
+      }
+    },
+    "/v1/projects/{project_id}/analytics/retrieval-completions": {
+      "post": {
+        "operationId": "report_retrieval_completion_v1_projects__project_id__analytics_retrieval_completions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetrievalReadyCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Report Retrieval Completion V1 Projects  Project Id  Analytics Retrieval Completions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Retrieval Completion"
       }
     },
     "/v1/projects/{project_id}/api-keys": {

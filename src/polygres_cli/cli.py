@@ -211,9 +211,35 @@ def main(argv: list[str] | None = None) -> int:
         command_id = str(uuid4())
         command_name = _command_name(args)
         ctx = _context(args, command_id=command_id, command_name=command_name)
+        command_started = time.monotonic()
         with ctx.client:
-            _guard_synced_project_surface(ctx, args)
-            result = int(args.func(ctx, args))
+            try:
+                _guard_synced_project_surface(ctx, args)
+                result = int(args.func(ctx, args))
+            except BaseException as exc:
+                ctx.client.report_command_completion(
+                    command_id=command_id,
+                    command_name=command_name,
+                    outcome="failed",
+                    duration_ms=(time.monotonic() - command_started) * 1000,
+                    project_id=_analytics_project_id(ctx),
+                    error_code=(
+                        exc.code
+                        if isinstance(exc, CliError)
+                        else "CLI_EXIT_NONZERO"
+                        if isinstance(exc, SystemExit)
+                        else "UNEXPECTED_CLI_ERROR"
+                    ),
+                )
+                raise
+            ctx.client.report_command_completion(
+                command_id=command_id,
+                command_name=command_name,
+                outcome="succeeded" if result == SUCCESS else "failed",
+                duration_ms=(time.monotonic() - command_started) * 1000,
+                project_id=_analytics_project_id(ctx),
+                error_code=None if result == SUCCESS else "CLI_EXIT_NONZERO",
+            )
         if result == SUCCESS and args.resource != "notices":
             _display_post_command_notices(base_url=resolve_api_base_url(ctx.config))
         return result
@@ -349,6 +375,11 @@ def _command_name(args: argparse.Namespace) -> str:
         if isinstance(value, str) and value:
             parts.append(value.replace("_", "-"))
     return ".".join(parts)[:80] or "unknown"
+
+
+def _analytics_project_id(ctx: Context) -> str | None:
+    project_id = ctx.args.project or ctx.selected_project_id
+    return project_id if project_id is not None and PROJECT_ID_RE.fullmatch(project_id) else None
 
 
 def _add_auth_parsers(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -668,9 +699,7 @@ def _add_context_parsers(
     capabilities = sub.add_parser("capabilities", help="inspect Context capabilities")
     capabilities.set_defaults(func=handle_context_capabilities)
 
-    init = sub.add_parser(
-        "init", help="reuse an eligible pgvector embedding column with pgContext"
-    )
+    init = sub.add_parser("init", help="reuse an eligible pgvector embedding column with pgContext")
     init.add_argument("--refresh", action="store_true")
     init.add_argument("--candidate", help="vector configuration UUID")
     init.add_argument("--name", help="Context collection name")
@@ -1064,6 +1093,7 @@ def handle_login(ctx: Context, args: argparse.Namespace) -> int:
             auth = validated_approved_auth(last_payload)
             ctx.config["auth"] = auth
             ctx.save()
+            ctx.client.adopt_login_credentials(auth)
             output = {"authenticated": True, "user": auth["user"]}
             if ctx.json:
                 write_json(output)
@@ -1226,9 +1256,7 @@ def handle_sync_create(ctx: Context, args: argparse.Namespace) -> int:
     deadline = time.monotonic() + args.timeout
     options_payload = ctx.client.project_creation_options()
     options = (
-        options_payload.get("options")
-        if isinstance(options_payload.get("options"), dict)
-        else {}
+        options_payload.get("options") if isinstance(options_payload.get("options"), dict) else {}
     )
     _require_sync_enabled(options)
 
@@ -1249,9 +1277,7 @@ def handle_sync_create(ctx: Context, args: argparse.Namespace) -> int:
     if preflight.get("status") not in {"source_ready", "admitted"}:
         raise _sync_source_inspection_error(preflight, options, idempotency_key=root_key)
 
-    selection = (
-        preflight.get("selection") if isinstance(preflight.get("selection"), dict) else {}
-    )
+    selection = preflight.get("selection") if isinstance(preflight.get("selection"), dict) else {}
     selected_count = selection.get("selected_count", 0)
     if not isinstance(selected_count, int) or isinstance(selected_count, bool):
         selected_count = 0
@@ -1742,9 +1768,7 @@ def handle_text_create_tsvector(ctx: Context, args: argparse.Namespace) -> int:
 def handle_text_create_fuzzy(ctx: Context, args: argparse.Namespace) -> int:
     row_id_columns = args.row_id_column or ["id"]
     _validate_text_limits(args.default_limit, args.max_limit)
-    _validate_identifiers(
-        args.schema, args.table, *row_id_columns, args.text_column, args.language
-    )
+    _validate_identifiers(args.schema, args.table, *row_id_columns, args.text_column, args.language)
     _validate_identifiers(*args.metadata_column, *args.filter_column)
     payload = {
         "name": args.name,
@@ -1872,9 +1896,7 @@ def handle_import_csv(ctx: Context, args: argparse.Namespace) -> int:
             "IMPORT_INVALID",
             "The API returned an incomplete CSV preview. Retry the import. "
             "If it happens again, contact support.",
-            request_id=(
-                str(preview.get("request_id")) if preview.get("request_id") else None
-            ),
+            request_id=(str(preview.get("request_id")) if preview.get("request_id") else None),
         )
     _validate_response_uuid(job_id, "import preview job")
     columns = preview_payload.get("columns")
@@ -1883,9 +1905,7 @@ def handle_import_csv(ctx: Context, args: argparse.Namespace) -> int:
             "IMPORT_INVALID",
             "The API returned an incomplete CSV preview. Retry the import. "
             "If it happens again, contact support.",
-            request_id=(
-                str(preview.get("request_id")) if preview.get("request_id") else None
-            ),
+            request_id=(str(preview.get("request_id")) if preview.get("request_id") else None),
         )
     import_fields: dict[str, object] = {
         "target_schema": args.schema,
@@ -2218,11 +2238,7 @@ def _row_request(
     if requested_context:
         body["context"] = {
             "reconcile": True,
-            **(
-                {"collection_id": args.context_collection}
-                if args.context_collection
-                else {}
-            ),
+            **({"collection_id": args.context_collection} if args.context_collection else {}),
         }
         if execution:
             body["idempotency_key"] = args.idempotency_key or f"rows-{uuid4()}"
@@ -2305,9 +2321,7 @@ def handle_context_init(ctx: Context, args: argparse.Namespace) -> int:
     payload = ctx.client.context_onboarding_action(project_id, action)
     onboarding = context_response_model(ContextOnboardingResponse, payload)
     status_value = (
-        onboarding.status.value
-        if hasattr(onboarding.status, "value")
-        else onboarding.status
+        onboarding.status.value if hasattr(onboarding.status, "value") else onboarding.status
     )
     status = str(status_value)
     if status in {"completed", "dismissed", "ineligible"}:
@@ -3614,10 +3628,7 @@ def _sync_create_selections(
         for table in available_tables
         if table.get("schema_name") == "public"
         and table.get("eligible") is True
-        and (
-            isinstance(table.get("sync_key"), dict)
-            or bool(table.get("sync_key_candidates"))
-        )
+        and (isinstance(table.get("sync_key"), dict) or bool(table.get("sync_key_candidates")))
     ]
     if not selectable:
         raise CliError(
@@ -3674,9 +3685,7 @@ def _sync_source_inspection_error(
     message = str(failure.get("message") or "The source database did not pass sync checks.")
     egress_ips = options.get("egress_ips") if isinstance(options.get("egress_ips"), list) else []
     allowlist = [
-        str(value.get("ip"))
-        for value in egress_ips
-        if isinstance(value, dict) and value.get("ip")
+        str(value.get("ip")) for value in egress_ips if isinstance(value, dict) and value.get("ip")
     ]
     if allowlist:
         message += " Ensure the source allows connections from: " + ", ".join(allowlist) + "."

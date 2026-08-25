@@ -28,7 +28,10 @@ def write_error(error: CliError, *, json_output: bool) -> None:
     else:
         message = error.message
         recovery = []
-        for key in ("operation_id", "idempotency_key"):
+        operation_id = error.details.get("operation_id")
+        if isinstance(operation_id, str) and operation_id:
+            recovery.append(f"error_code: {error.code}")
+        for key in ("failure_stage", "operation_id", "idempotency_key"):
             value = error.details.get(key)
             if isinstance(value, str) and value:
                 recovery.append(f"{key}: {redact(value)}")

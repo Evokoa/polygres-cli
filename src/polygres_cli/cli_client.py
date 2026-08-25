@@ -133,6 +133,52 @@ class CliControlPlaneClient:
             "/cli/auth/revoke", revoke_request(refresh_token=refresh_token), auth=False
         )
 
+    def report_command_completion(
+        self,
+        *,
+        command_id: str,
+        command_name: str,
+        outcome: str,
+        duration_ms: float,
+        project_id: str | None,
+        error_code: str | None,
+    ) -> None:
+        """Send command telemetry without changing command behavior."""
+
+        if not self._access_token:
+            return
+        payload: dict[str, object] = {
+            "command_id": command_id,
+            "command_name": command_name,
+            "outcome": outcome,
+            "duration_ms": max(0.0, duration_ms),
+        }
+        if project_id is not None:
+            payload["project_id"] = project_id
+        if error_code is not None:
+            payload["error_code"] = error_code
+        try:
+            self._client.post(
+                f"{self._base_url}/cli/analytics/command-completions",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {self._access_token}",
+                    "User-Agent": f"polygres-cli/{__version__}",
+                },
+                timeout=1.0,
+            )
+        except Exception:
+            return
+
+    def adopt_login_credentials(self, payload: dict[str, Any]) -> None:
+        """Use newly issued credentials for the login command's completion event."""
+
+        access_token = payload.get("access_token")
+        refresh_token = payload.get("refresh_token")
+        if isinstance(access_token, str) and isinstance(refresh_token, str):
+            self._access_token = access_token
+            self._refresh_token = refresh_token
+
     def me(self) -> dict[str, Any]:
         return self._get("/me")
 
@@ -226,6 +272,7 @@ class CliControlPlaneClient:
             {
                 "name": name,
                 "project_type": "postgres_sync",
+                "selected_data_source": "postgres",
                 "preflight_attempt_id": preflight_attempt_id,
                 "expected_selection_generation": expected_selection_generation,
                 "confirmations": {
@@ -270,9 +317,7 @@ class CliControlPlaneClient:
                 "IMPORT_INVALID",
                 "The API returned an invalid CSV upload session. Retry the import. "
                 "If it happens again, contact support.",
-                request_id=(
-                    str(session.get("request_id")) if session.get("request_id") else None
-                ),
+                request_id=(str(session.get("request_id")) if session.get("request_id") else None),
             )
         job_id = upload.get("job_id")
         upload_url = upload.get("upload_url")
@@ -288,9 +333,7 @@ class CliControlPlaneClient:
                 "IMPORT_INVALID",
                 "The API returned an incomplete CSV upload session. Retry the import. "
                 "If it happens again, contact support.",
-                request_id=(
-                    str(session.get("request_id")) if session.get("request_id") else None
-                ),
+                request_id=(str(session.get("request_id")) if session.get("request_id") else None),
             )
         sha256 = self._upload_csv_blocks(file, upload_url, block_size)
         payload: dict[str, Any] = {
@@ -587,9 +630,7 @@ class CliControlPlaneClient:
         )
 
     def get_text_configuration(self, project_id: str, config_id: str) -> dict[str, Any]:
-        return self._get(
-            f"/projects/{project_id}/text/configurations/{quote(config_id, safe='')}"
-        )
+        return self._get(f"/projects/{project_id}/text/configurations/{quote(config_id, safe='')}")
 
     def update_text_configuration(
         self, project_id: str, config_id: str, payload: dict[str, Any]
@@ -674,14 +715,10 @@ class CliControlPlaneClient:
             timeout=HEAVY_REQUEST_TIMEOUT,
         )
 
-    def context_collections_status(
-        self, project_id: str, collection_id: str
-    ) -> dict[str, Any]:
+    def context_collections_status(self, project_id: str, collection_id: str) -> dict[str, Any]:
         return self._get(self._context_path(project_id, f"/collections/{collection_id}/status"))
 
-    def context_collections_verify(
-        self, project_id: str, collection_id: str
-    ) -> dict[str, Any]:
+    def context_collections_verify(self, project_id: str, collection_id: str) -> dict[str, Any]:
         return self._post(
             self._context_path(project_id, f"/collections/{collection_id}/verify"),
             {},
@@ -742,9 +779,7 @@ class CliControlPlaneClient:
         )
 
     def context_filters_list(self, project_id: str, collection_id: str) -> dict[str, Any]:
-        return self._get(
-            self._context_path(project_id, f"/collections/{collection_id}/filters")
-        )
+        return self._get(self._context_path(project_id, f"/collections/{collection_id}/filters"))
 
     def context_filters_add_column(
         self,
@@ -770,9 +805,7 @@ class CliControlPlaneClient:
         idempotency_key: str,
     ) -> dict[str, Any]:
         return self._post(
-            self._context_path(
-                project_id, f"/collections/{collection_id}/filters/jsonb-paths"
-            ),
+            self._context_path(project_id, f"/collections/{collection_id}/filters/jsonb-paths"),
             payload,
             retry=True,
             idempotency_key=idempotency_key,
@@ -914,34 +947,22 @@ class CliControlPlaneClient:
     def context_search(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/search"), payload)
 
-    def context_grouped_search(
-        self, project_id: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    def context_grouped_search(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/grouped-search"), payload)
 
-    def context_recall_check(
-        self, project_id: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    def context_recall_check(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/recall-check"), payload)
 
-    def context_text_hybrid(
-        self, project_id: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    def context_text_hybrid(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/hybrid/text"), payload)
 
-    def context_graph_first(
-        self, project_id: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    def context_graph_first(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/hybrid/graph-first"), payload)
 
-    def context_vector_first(
-        self, project_id: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    def context_vector_first(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/hybrid/vector-first"), payload)
 
-    def context_rank_fusion(
-        self, project_id: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    def context_rank_fusion(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/hybrid/rank-fusion"), payload)
 
     def context_joint(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
