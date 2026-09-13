@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from string import Formatter
 from types import MappingProxyType
 
 from .generated import ERROR_CATALOG_DATA
@@ -11,6 +12,7 @@ from .generated import ERROR_CATALOG_DATA
 class ErrorVariantDescriptor:
     message: str
     http_status: int
+    message_template: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +40,7 @@ def _build_catalog() -> Mapping[str, ErrorDescriptor]:
                 name: ErrorVariantDescriptor(
                     message=value["message"],
                     http_status=value["http_status"],
+                    message_template=value.get("message_template"),
                 )
                 for name, value in row["variants"].items()
             }
@@ -64,7 +67,9 @@ def _build_catalog() -> Mapping[str, ErrorDescriptor]:
 ERROR_CATALOG = _build_catalog()
 
 
-def render_error(code: str, *, variant: str | None = None) -> tuple[str, int]:
+def render_error(
+    code: str, *, variant: str | None = None, details: Mapping[str, object] | None = None
+) -> tuple[str, int]:
     """Return catalog-owned user copy and HTTP status for an error identity."""
     try:
         descriptor = ERROR_CATALOG[code]
@@ -76,6 +81,18 @@ def render_error(code: str, *, variant: str | None = None) -> tuple[str, int]:
         selected = descriptor.variants[variant]
     except KeyError as exc:
         raise ValueError(f"unknown error variant: {code}/{variant}") from exc
+    # The ordinary message is complete fallback copy for callers without context.
+    supplied = _safe_details(descriptor, details)
+    template = selected.message_template
+    if template is not None:
+        fields = {field for _, field, _, _ in Formatter().parse(template) if field is not None}
+        if fields and all(
+            field in supplied
+            and type(supplied[field]) in (str, int, float)
+            and len(str(supplied[field])) <= 256
+            for field in fields
+        ):
+            return template.format_map(supplied), selected.http_status
     return selected.message, selected.http_status
 
 
@@ -122,7 +139,7 @@ def error_record(
         descriptor = ERROR_CATALOG[code]
     except KeyError as exc:
         raise ValueError(f"unknown error code: {code}") from exc
-    message, status_code = render_error(code, variant=variant)
+    message, status_code = render_error(code, variant=variant, details=details)
     return CatalogErrorRecord(
         code=code,
         variant=variant,

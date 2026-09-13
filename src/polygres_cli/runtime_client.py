@@ -120,7 +120,9 @@ class RuntimeClient:
             return payload
 
     def _grant(self, project_id: str, scope: str) -> dict[str, Any]:
-        if scope not in {"graph:read", "graph:manage", "rows:write"}:
+        if scope not in {
+            "graph:read", "graph:manage", "rows:write", "context:read", "context:manage"
+        }:
             raise ValueError("Runtime grant scope is invalid")
         key = (project_id, scope)
         cached = self._grants.get(key)
@@ -177,6 +179,9 @@ def validate_runtime_api_url(value: str, project_id: str, *, allow_local_http: b
     managed_hosts = {
         f"{project_id}.{runtime_domain}" for runtime_domain in MANAGED_RUNTIME_API_DOMAINS
     }
+    allowed_paths = {"/v1"}
+    if allow_local_http and loopback:
+        allowed_paths.add(f"/v1/local-runtime/{project_id}/v1")
     if (
         not parsed.netloc
         or parsed.username is not None
@@ -184,7 +189,7 @@ def validate_runtime_api_url(value: str, project_id: str, *, allow_local_http: b
         or (parsed.port is not None and not (allow_local_http and loopback))
         or parsed.query
         or parsed.fragment
-        or parsed.path != "/v1"
+        or parsed.path not in allowed_paths
         or (
             parsed.scheme != "https"
             and not (allow_local_http and parsed.scheme == "http" and loopback)

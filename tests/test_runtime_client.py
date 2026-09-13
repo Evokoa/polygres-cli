@@ -14,6 +14,19 @@ RUNTIME_URL = f"https://{PROJECT_ID}.api.db.polygres.com/v1"
 STAGING_RUNTIME_URL = f"https://{PROJECT_ID}.api.staging.db.polygres.com/v1"
 
 
+def test_local_runtime_forwarding_url_is_bound_to_project_and_local_mode() -> None:
+    url = f"http://127.0.0.1:8000/v1/local-runtime/{PROJECT_ID}/v1"
+    assert validate_runtime_api_url(url, PROJECT_ID, allow_local_http=True) == url
+    for candidate, project, local in [
+        (url, PROJECT_ID, False),
+        (url, "p11111111111111111111111", True),
+        (url.replace("127.0.0.1", "example.com"), PROJECT_ID, True),
+        (url + "/extra", PROJECT_ID, True),
+    ]:
+        with pytest.raises(ValueError):
+            validate_runtime_api_url(candidate, project, allow_local_http=local)
+
+
 def _grant(
     scope: str,
     token: str = "runtime-token",

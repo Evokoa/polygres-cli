@@ -678,18 +678,236 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'reset_class': 'none',
   'cli_exit_code': 2,
   'variants': {}},
+ {'code': 'BILLING_IDEMPOTENCY_CONFLICT',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'This billing request was repeated with different details. Refresh your billing '
+             'information and try again.',
+  'message_key': 'polygres.error.billing_idempotency_conflict',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'BILLING_NOT_CONFIGURED',
+  'family': 'billing',
+  'category': 'dependency',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 503,
+  'message': 'Billing is temporarily unavailable. Try again later.',
+  'message_key': 'polygres.error.billing_not_configured',
+  'safe_detail_fields': [],
+  'retry_class': 'after_delay',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'BILLING_PLAN_CHANGE_INVALID',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': "This plan change is not available for the organization's current subscription.",
+  'message_key': 'polygres.error.billing_plan_change_invalid',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'BILLING_PORTAL_UNAVAILABLE',
+  'family': 'billing',
+  'category': 'dependency',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 503,
+  'message': 'Payment methods and invoices are temporarily unavailable. Try again later.',
+  'message_key': 'polygres.error.billing_portal_unavailable',
+  'safe_detail_fields': [],
+  'retry_class': 'after_delay',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'BILLING_PROJECT_ACTIVATION_INVALID',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'operator',
+  'http_status': 409,
+  'message': 'Paid billing can start only after the isolated project operation succeeds.',
+  'message_key': 'polygres.error.billing_project_activation_invalid',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'BILLING_RECONCILIATION_INVALID',
+  'family': 'billing',
+  'category': 'validation',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'operator',
+  'http_status': 422,
+  'message': 'The top-up reconciliation action is not valid for this purchase.',
+  'message_key': 'polygres.error.billing_reconciliation_invalid',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 2,
+  'variants': {}},
+ {'code': 'BILLING_REFUND_INVALID',
+  'family': 'billing',
+  'category': 'validation',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'operator',
+  'http_status': 422,
+  'message': 'Only a qualifying paid subscription invoice can be fully refunded.',
+  'message_key': 'polygres.error.billing_refund_invalid',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 2,
+  'variants': {}},
  {'code': 'BILLING_REQUIRED',
   'family': 'core',
   'category': 'authorization',
   'kind': ['public', 'persisted_operation'],
   'visibility': 'public',
   'http_status': 403,
-  'message': 'Active or beta billing status is required.',
+  'message': 'A current eligible organization subscription is required.',
   'message_key': 'polygres.error.billing_required',
   'safe_detail_fields': [],
   'retry_class': 'after_user_action',
   'reset_class': 'none',
   'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'BILLING_SUBSCRIPTION_CONFLICT',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'This organization already has an active or pending subscription.',
+  'message_key': 'polygres.error.billing_subscription_conflict',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'BILLING_TOP_UP_PURCHASE_NOT_FOUND',
+  'family': 'billing',
+  'category': 'not_found',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 404,
+  'message': 'The requested top-up purchase was not found.',
+  'message_key': 'polygres.error.billing_top_up_purchase_not_found',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'CAPACITY_CAPABILITY_PAUSED',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'This project has reached its temporary capacity allowance. Increase capacity or '
+             'reduce usage before adding more work.',
+  'message_key': 'polygres.error.capacity_capability_paused',
+  'safe_detail_fields': ['configured_limit',
+                         'current_usage',
+                         'dimension',
+                         'grace_ceiling',
+                         'upgrade_path'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'CAPACITY_CONFIGURATION_INVALID',
+  'family': 'billing',
+  'category': 'validation',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 422,
+  'message': 'Choose capacity values within the limits and increments shown for this project.',
+  'message_key': 'polygres.error.capacity_configuration_invalid',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 2,
+  'variants': {}},
+ {'code': 'CAPACITY_DECREASE_REQUIRES_CLEANUP',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'Reduce current usage before applying this lower capacity.',
+  'message_key': 'polygres.error.capacity_decrease_requires_cleanup',
+  'safe_detail_fields': ['active_reservations',
+                         'active_reservations_scaled',
+                         'current_usage',
+                         'current_usage_scaled',
+                         'dimension',
+                         'minimum_cleanup_required',
+                         'minimum_cleanup_required_scaled',
+                         'requested_limit',
+                         'unit_scale'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'CAPACITY_GRACE_CEILING_EXCEEDED',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': "This change would exceed the project's temporary capacity allowance.",
+  'message_key': 'polygres.error.capacity_grace_ceiling_exceeded',
+  'safe_detail_fields': ['configured_limit',
+                         'current_usage',
+                         'dimension',
+                         'grace_ceiling',
+                         'upgrade_path'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'CAPACITY_PAYMENT_FAILED',
+  'family': 'billing',
+  'category': 'payment',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 402,
+  'message': 'The capacity upgrade payment could not be completed. No additional capacity was '
+             'activated.',
+  'message_key': 'polygres.error.capacity_payment_failed',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'CAPACITY_STATE_UNAVAILABLE',
+  'family': 'billing',
+  'category': 'dependency',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 503,
+  'message': "Polygres is still updating this project's capacity status. Try again shortly.",
+  'message_key': 'polygres.error.capacity_state_unavailable',
+  'safe_detail_fields': ['configured_limit',
+                         'current_usage',
+                         'dimension',
+                         'grace_ceiling',
+                         'upgrade_path'],
+  'retry_class': 'after_delay',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
   'variants': {}},
  {'code': 'CATALOG_UNAVAILABLE',
   'family': 'core',
@@ -1491,7 +1709,7 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'http_status': 400,
   'message': 'Context request exceeds a limit.',
   'message_key': 'polygres.error.context_limit_exceeded',
-  'safe_detail_fields': ['failure_stage', 'field', 'limit', 'operation_id'],
+  'safe_detail_fields': ['failure_stage', 'field', 'limit', 'operation_id', 'hint'],
   'retry_class': 'after_user_action',
   'reset_class': 'none',
   'cli_exit_code': 2,
@@ -1500,7 +1718,10 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
                                                    'http_status': 400},
                'context_exceeds_effective_graph_limit': {'message': 'Context request exceeds the '
                                                                     'effective graph limit.',
-                                                         'http_status': 400}}},
+                                                         'http_status': 400},
+               'context_hnsw_record_limit': {'message': 'The selected dimensions exceed the '
+                                                        'verified HNSW storage budget.',
+                                             'http_status': 400}}},
  {'code': 'CONTEXT_MEMORY_PRESSURE',
   'family': 'context',
   'category': 'conflict',
@@ -2628,6 +2849,32 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'reset_class': 'none',
   'cli_exit_code': 2,
   'variants': {}},
+ {'code': 'CREDIT_IDEMPOTENCY_CONFLICT',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'operator',
+  'http_status': 409,
+  'message': 'This idempotency key was already used for a different credit adjustment.',
+  'message_key': 'polygres.error.credit_idempotency_conflict',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'CREDIT_INSUFFICIENT_BALANCE',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'The available organization credit balance is too low for this action.',
+  'message_key': 'polygres.error.credit_insufficient_balance',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
  {'code': 'CSV_DELIMITER_UNSUPPORTED',
   'family': 'imports',
   'category': 'validation',
@@ -3174,10 +3421,26 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'retry_class': 'after_delay',
   'reset_class': 'none',
   'cli_exit_code': 8,
-  'variants': {'project_data_plane_credentials_not_configured': {'message': 'Project data-plane '
+  'variants': {'basic_upgrade_migration_requires_direct_connection': {'message': 'Basic project '
+                                                                                 'migration '
+                                                                                 'requires a '
+                                                                                 'direct '
+                                                                                 'data-plane '
+                                                                                 'connection.',
+                                                                      'http_status': 503},
+               'basic_upgrade_target_not_registered': {'message': 'Basic project data-plane '
+                                                                  'registration is not ready.',
+                                                       'http_status': 503},
+               'project_data_plane_credentials_not_configured': {'message': 'Project data-plane '
                                                                             'credentials are not '
                                                                             'configured.',
-                                                                 'http_status': 503}}},
+                                                                 'http_status': 503},
+               'shared_project_role_missing': {'message': 'This project is missing a required '
+                                                          'database access role. Contact support '
+                                                          'and include the project ID and request '
+                                                          'ID shown. Changing your tool arguments '
+                                                          'will not resolve the missing role.',
+                                               'http_status': 503}}},
  {'code': 'DATA_PLANE_DRIVER_UNAVAILABLE',
   'family': 'data_plane',
   'category': 'dependency',
@@ -3299,6 +3562,19 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
                'unique_violation': {'message': 'This operation conflicts with an existing unique '
                                                'value. Remove duplicate values and try again.',
                                     'http_status': 409}}},
+ {'code': 'DEPENDENCY_UNAVAILABLE',
+  'family': 'mcp',
+  'category': 'dependency',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 503,
+  'message': 'An upstream service is temporarily unavailable. Try again shortly.',
+  'message_key': 'polygres.error.dependency_unavailable',
+  'safe_detail_fields': [],
+  'retry_class': 'dependency_retry',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {}},
  {'code': 'DIRECT_RUNTIME_ACCESS_DISABLED',
   'family': 'core',
   'category': 'dependency',
@@ -3524,6 +3800,377 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'retry_class': 'after_delay',
   'reset_class': 'none',
   'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'EMBEDDING_CHUNK_BOUNDARY_INVALID',
+  'family': 'context',
+  'category': 'validation',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 422,
+  'message': 'The text cannot be split safely with these token limits. Increase the chunk size.',
+  'message_key': 'polygres.error.embedding_chunk_boundary_invalid',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_CONFIGURATION_CONFLICT',
+  'family': 'context',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'The embedding configuration changed. Refresh it and try again.',
+  'message_key': 'polygres.error.embedding_configuration_conflict',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'EMBEDDING_CONFIGURATION_NOT_FOUND',
+  'family': 'context',
+  'category': 'not_found',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 404,
+  'message': 'The embedding configuration was not found.',
+  'message_key': 'polygres.error.embedding_configuration_not_found',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_CREDIT_LIMIT_EXCEEDED',
+  'family': 'context',
+  'category': 'payment',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'The project embedding credit limit has been reached.',
+  'message_key': 'polygres.error.embedding_credit_limit_exceeded',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'EMBEDDING_CREDIT_SPENDING_DISABLED',
+  'family': 'context',
+  'category': 'authorization',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 403,
+  'message': 'Organization credit spending is not enabled for this project. Ask an organization '
+             'billing administrator to enable it.',
+  'message_key': 'polygres.error.embedding_credit_spending_disabled',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_INPUT_TOO_LONG',
+  'family': 'context',
+  'category': 'validation',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 422,
+  'message': 'Embedding input exceeds a model, source-record, or chunk limit. Split large records '
+             'or adjust chunk size and overlap.',
+  'message_key': 'polygres.error.embedding_input_too_long',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_MODEL_INVALID',
+  'family': 'context',
+  'category': 'validation',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 422,
+  'message': 'The embedding model configuration is invalid. Check its endpoint, tokenizer and '
+             'supported dimensions.',
+  'message_key': 'polygres.error.embedding_model_invalid',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_MODEL_IN_USE',
+  'family': 'context',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'This model has configuration or usage references and cannot be deleted. Retire it '
+             'instead.',
+  'message_key': 'polygres.error.embedding_model_in_use',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'EMBEDDING_MODEL_UNAVAILABLE',
+  'family': 'context',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'This embedding model is unavailable. Select an enabled model or contact an '
+             'administrator.',
+  'message_key': 'polygres.error.embedding_model_unavailable',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'EMBEDDING_OPERATION_FAILED',
+  'family': 'context',
+  'category': 'dependency',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 503,
+  'message': 'Embedding processing failed. Review the configuration status and retry eligible '
+             'work.',
+  'message_key': 'polygres.error.embedding_operation_failed',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_delay',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'EMBEDDING_PROVIDER_CREDENTIALS_MISSING',
+  'family': 'context',
+  'category': 'dependency',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 503,
+  'message': 'Embedding provider credentials are missing or rejected. Contact an administrator.',
+  'message_key': 'polygres.error.embedding_provider_credentials_missing',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'EMBEDDING_PROVIDER_OUTCOME_UNKNOWN',
+  'family': 'context',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'The provider outcome is uncertain. Reconcile its usage before retrying to prevent '
+             'duplicate charges.',
+  'message_key': 'polygres.error.embedding_provider_outcome_unknown',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'EMBEDDING_PROVIDER_RATE_LIMITED',
+  'family': 'context',
+  'category': 'rate_limit',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 429,
+  'message': 'The embedding provider is rate limiting requests. Processing will retry after a '
+             'delay.',
+  'message_key': 'polygres.error.embedding_provider_rate_limited',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_delay',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_PROVIDER_REQUEST_REJECTED',
+  'family': 'context',
+  'category': 'validation',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 422,
+  'message': 'The provider rejected the embedding request. Check the model configuration and input '
+             'limits.',
+  'message_key': 'polygres.error.embedding_provider_request_rejected',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_PROVIDER_UNAVAILABLE',
+  'family': 'context',
+  'category': 'dependency',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 503,
+  'message': 'The embedding provider is unavailable. Processing will retry.',
+  'message_key': 'polygres.error.embedding_provider_unavailable',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_delay',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'EMBEDDING_QUOTA_EXHAUSTED',
+  'family': 'context',
+  'category': 'rate_limit',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 429,
+  'message': 'The project embedding allowance is exhausted. Enable authorized credits or wait for '
+             'the next period.',
+  'message_key': 'polygres.error.embedding_quota_exhausted',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_SEARCH_NOT_READY',
+  'family': 'context',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'The managed embeddings or the associated AI Context collection are not ready for '
+             'search.',
+  'message_key': 'polygres.error.embedding_search_not_ready',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'EMBEDDING_SERVICE_UNAVAILABLE',
+  'family': 'context',
+  'category': 'dependency',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 503,
+  'message': 'The managed embedding service is not configured or unavailable. Contact an '
+             'administrator.',
+  'message_key': 'polygres.error.embedding_service_unavailable',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'EMBEDDING_SOURCE_CHANGED',
+  'family': 'context',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'The watched source changed or is unavailable. Reconcile the configuration before '
+             'continuing.',
+  'message_key': 'polygres.error.embedding_source_changed',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
+  'variants': {}},
+ {'code': 'EMBEDDING_SOURCE_INVALID',
+  'family': 'context',
+  'category': 'validation',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 422,
+  'message': 'The embedding source requires a text column and a stable, non-null unique row key.',
+  'message_key': 'polygres.error.embedding_source_invalid',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'EMBEDDING_USAGE_CONFLICT',
+  'family': 'context',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'Embedding usage conflicts with a recorded request. Reconcile the operation before '
+             'continuing.',
+  'message_key': 'polygres.error.embedding_usage_conflict',
+  'safe_detail_fields': ['configuration_id',
+                         'operation_id',
+                         'model_id',
+                         'usage_kind',
+                         'retry_after_seconds'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
   'variants': {}},
  {'code': 'EXPRESSION_INDEX_UNSUPPORTED',
   'family': 'core',
@@ -3759,6 +4406,19 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'retry_class': 'after_user_action',
   'reset_class': 'none',
   'cli_exit_code': 2,
+  'variants': {}},
+ {'code': 'GRAPH_CONCURRENT_BUILD_UNAVAILABLE',
+  'family': 'graph',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'Basic projects build graphs synchronously. Retry with concurrent set to false.',
+  'message_key': 'polygres.error.graph_concurrent_build_unavailable',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 6,
   'variants': {}},
  {'code': 'GRAPH_CONFIGURATION_EMPTY',
   'family': 'graph',
@@ -4587,8 +5247,8 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'kind': ['public', 'persisted_operation'],
   'visibility': 'public',
   'http_status': 500,
-  'message': 'The authentication request failed. Please wait a while and try again. If it '
-             'continues, contact support.',
+  'message': 'The request failed unexpectedly. Please wait a while and try again. If it continues, '
+             'contact support.',
   'message_key': 'polygres.error.internal_error',
   'safe_detail_fields': [],
   'retry_class': 'never',
@@ -4624,6 +5284,21 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'retry_class': 'user_retry',
   'reset_class': 'none',
   'cli_exit_code': 3,
+  'variants': {}},
+ {'code': 'INVALID_UPSTREAM_RESPONSE',
+  'family': 'mcp',
+  'category': 'dependency',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 502,
+  'message': "Polygres could not read the service's response. If this request changed data, check "
+             'the affected record or operation status before submitting it again. If you cannot '
+             'confirm the result, contact support and include the request ID shown.',
+  'message_key': 'polygres.error.invalid_upstream_response',
+  'safe_detail_fields': [],
+  'retry_class': 'never',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
   'variants': {}},
  {'code': 'INVITATION_DELIVERY_FAILED',
   'family': 'organization',
@@ -5107,6 +5782,869 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'reset_class': 'none',
   'cli_exit_code': 8,
   'variants': {}},
+ {'code': 'MCP_CONFIGURATION_INVALID',
+  'family': 'mcp',
+  'category': 'validation',
+  'kind': ['public'],
+  'visibility': 'operator',
+  'http_status': 500,
+  'message': 'The MCP service configuration is invalid.',
+  'message_key': 'polygres.error.mcp_configuration_invalid',
+  'safe_detail_fields': [],
+  'retry_class': 'never',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {'api_base_url_must_be_an_absolute_http_url': {'message': 'API base URL must be an '
+                                                                        'absolute HTTP URL',
+                                                             'http_status': 500},
+               'api_path_must_be_absolute_and_may_not_traverse': {'message': 'API path must be '
+                                                                             'absolute and may not '
+                                                                             'traverse',
+                                                                  'http_status': 500},
+               'runtime_api_base_url_must_end_with_v1': {'message': 'Runtime API base URL must end '
+                                                                    'with /v1',
+                                                         'http_status': 500},
+               'service_urls_must_be_absolute_http_urls_without_fragments': {'message': 'service '
+                                                                                        'URLs must '
+                                                                                        'be '
+                                                                                        'absolute '
+                                                                                        'HTTP URLs '
+                                                                                        'without '
+                                                                                        'fragments',
+                                                                             'http_status': 500},
+               'local_project_ids_must_be_unique': {'message': 'local project IDs must be unique',
+                                                    'http_status': 500},
+               'local_access_token_is_allowed_only_in_insecure_no_oauth_mode': {'message': 'local '
+                                                                                           'access '
+                                                                                           'token '
+                                                                                           'is '
+                                                                                           'allowed '
+                                                                                           'only '
+                                                                                           'in '
+                                                                                           'insecure '
+                                                                                           'no-OAuth '
+                                                                                           'mode',
+                                                                                'http_status': 500},
+               'oauth_audience_must_equal_the_canonical_mcp_public_url': {'message': 'OAuth '
+                                                                                     'audience '
+                                                                                     'must equal '
+                                                                                     'the '
+                                                                                     'canonical '
+                                                                                     'MCP public '
+                                                                                     'URL',
+                                                                          'http_status': 500},
+               'staging_must_use_the_canonical_mcp_hostname': {'message': 'staging must use the '
+                                                                          'canonical MCP hostname',
+                                                               'http_status': 500},
+               'production_must_use_the_canonical_mcp_hostname': {'message': 'production must use '
+                                                                             'the canonical MCP '
+                                                                             'hostname',
+                                                                  'http_status': 500},
+               'local_mcp_must_bind_and_publish_only_on_loopback': {'message': 'local MCP must '
+                                                                               'bind and publish '
+                                                                               'only on loopback',
+                                                                    'http_status': 500},
+               'insecure_no_oauth_mode_requires_a_loopback_central_api': {'message': 'insecure '
+                                                                                     'no-OAuth '
+                                                                                     'mode '
+                                                                                     'requires a '
+                                                                                     'loopback '
+                                                                                     'Central API',
+                                                                          'http_status': 500},
+               'insecure_no_oauth_mode_requires_a_loopback_dashboard': {'message': 'insecure '
+                                                                                   'no-OAuth mode '
+                                                                                   'requires a '
+                                                                                   'loopback '
+                                                                                   'dashboard',
+                                                                        'http_status': 500},
+               'local_oauth_endpoints_must_use_loopback': {'message': 'local OAuth endpoints must '
+                                                                      'use loopback',
+                                                           'http_status': 500},
+               'insecure_no_oauth_mode_is_forbidden_outside_local_development': {'message': 'insecure '
+                                                                                            'no-OAuth '
+                                                                                            'mode '
+                                                                                            'is '
+                                                                                            'forbidden '
+                                                                                            'outside '
+                                                                                            'local '
+                                                                                            'development',
+                                                                                 'http_status': 500},
+               'staging_and_production_require_a_nonloopback_https_service': {'message': 'staging '
+                                                                                         'and '
+                                                                                         'production '
+                                                                                         'require '
+                                                                                         'a '
+                                                                                         'nonloopback '
+                                                                                         'HTTPS '
+                                                                                         'service',
+                                                                              'http_status': 500},
+               'deployed_oauth_endpoints_must_use_https': {'message': 'deployed OAuth endpoints '
+                                                                      'must use HTTPS',
+                                                           'http_status': 500},
+               'deployed_dashboard_must_use_https': {'message': 'deployed dashboard must use HTTPS',
+                                                     'http_status': 500}}},
+ {'code': 'MCP_CONSENT_ACCOUNT_CHANGED',
+  'family': 'mcp',
+  'category': 'authorization',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 403,
+  'message': 'The signed-in account changed. Reload this request to review it before authorizing.',
+  'message_key': 'polygres.error.mcp_consent_account_changed',
+  'safe_detail_fields': [],
+  'retry_class': 'user_retry',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'MCP_CONSENT_ACCOUNT_MISMATCH',
+  'family': 'mcp',
+  'category': 'authorization',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 403,
+  'message': 'This account cannot authorize the requested connection. Use another account to '
+             'continue.',
+  'message_key': 'polygres.error.mcp_consent_account_mismatch',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {}},
+ {'code': 'MCP_CONSENT_UNAVAILABLE',
+  'family': 'mcp',
+  'category': 'authorization',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 400,
+  'message': 'This connection request is unavailable or has expired. Return to your client app and '
+             'start connecting again.',
+  'message_key': 'polygres.error.mcp_consent_unavailable',
+  'safe_detail_fields': [],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {'not_found': {'message': 'This connection request is unavailable or has expired. '
+                                        'Return to your client app and start connecting again.',
+                             'http_status': 404}}},
+ {'code': 'MCP_INTERNAL_CONFIGURATION_ERROR',
+  'family': 'mcp',
+  'category': 'internal',
+  'kind': ['public'],
+  'visibility': 'operator',
+  'http_status': 500,
+  'message': 'The MCP tool configuration is inconsistent.',
+  'message_key': 'polygres.error.mcp_internal_configuration_error',
+  'safe_detail_fields': [],
+  'retry_class': 'never',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {'unsupported_runtime_method': {'message': 'unsupported Runtime method',
+                                              'http_status': 500},
+               'unsupported_central_api_method': {'message': 'unsupported Central API method',
+                                                  'http_status': 500},
+               'tool_has_no_runtime_scope': {'message': 'tool has no Runtime scope',
+                                             'http_status': 500},
+               'the_launch_tool_policy_count_does_not_match_the_required_count_o': {'message': 'The '
+                                                                                               'registered '
+                                                                                               'tool '
+                                                                                               'policy '
+                                                                                               'count '
+                                                                                               'does '
+                                                                                               'not '
+                                                                                               'match '
+                                                                                               'the '
+                                                                                               'expected '
+                                                                                               'catalog.',
+                                                                                    'http_status': 500}}},
+ {'code': 'MCP_INTERNAL_ERROR',
+  'family': 'mcp',
+  'category': 'internal',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 500,
+  'message': 'The MCP request could not be completed. Contact support with the request ID.',
+  'message_key': 'polygres.error.mcp_internal_error',
+  'safe_detail_fields': [],
+  'retry_class': 'never',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'MCP_REQUEST_DENIED',
+  'family': 'mcp',
+  'category': 'authorization',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 403,
+  'message': 'This connection is not authorized to perform this action. Check its project, enabled '
+             'features, and access level in the Polygres dashboard. If you need additional access, '
+             'contact your organization administrator.',
+  'message_key': 'polygres.error.mcp_request_denied',
+  'safe_detail_fields': ['fixed_project_id', 'project_id'],
+  'retry_class': 'never',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
+  'variants': {'oauth_authentication_is_required': {'message': 'Reconnect your Polygres MCP '
+                                                               'connection and complete browser '
+                                                               'sign-in, then try again.',
+                                                    'http_status': 403},
+               'connection_url_does_not_match_the_approved_installation': {'message': 'This '
+                                                                                      'connection '
+                                                                                      'URL differs '
+                                                                                      'from the '
+                                                                                      'one you '
+                                                                                      'authorized. '
+                                                                                      'Restore the '
+                                                                                      'original '
+                                                                                      'URL, or '
+                                                                                      'create and '
+                                                                                      'authorize a '
+                                                                                      'new '
+                                                                                      'connection '
+                                                                                      'with the '
+                                                                                      'project and '
+                                                                                      'access '
+                                                                                      'settings '
+                                                                                      'you need.',
+                                                                           'http_status': 403},
+               'project_id_is_required_in_multi_project_mode': {'message': 'project_id is required '
+                                                                           'in multi-project mode',
+                                                                'http_status': 403},
+               'project_is_not_in_the_local_development_allowlist': {'message': 'The requested '
+                                                                                'project is not '
+                                                                                'enabled for this '
+                                                                                'local MCP '
+                                                                                'service. Choose '
+                                                                                'an enabled '
+                                                                                'project, or ask '
+                                                                                'the service '
+                                                                                'operator to add '
+                                                                                'this project to '
+                                                                                'the local project '
+                                                                                'allowlist.',
+                                                                     'http_status': 403},
+               'invalid_mcp_connection_url': {'message': 'This MCP connection URL is invalid. Copy '
+                                                         'the complete connection URL from the '
+                                                         'Polygres dashboard and reconnect your '
+                                                         'MCP client.',
+                                              'http_status': 403},
+               'insecure_local_mode_does_not_accept_credentials': {'message': 'This local MCP '
+                                                                              'service runs '
+                                                                              'without '
+                                                                              'authentication, but '
+                                                                              'your connection '
+                                                                              'supplied '
+                                                                              'credentials. Remove '
+                                                                              'credentials from '
+                                                                              'this local '
+                                                                              'connection. If you '
+                                                                              'need an '
+                                                                              'authenticated '
+                                                                              'connection, ask the '
+                                                                              'service operator to '
+                                                                              'enable OAuth.',
+                                                                   'http_status': 403},
+               'fixed_project_is_not_in_the_local_development_allowlist': {'message': 'This '
+                                                                                      'connection '
+                                                                                      'targets a '
+                                                                                      'project '
+                                                                                      'that is not '
+                                                                                      'enabled for '
+                                                                                      'the local '
+                                                                                      'MCP '
+                                                                                      'service. '
+                                                                                      'Use a '
+                                                                                      'connection '
+                                                                                      'for an '
+                                                                                      'enabled '
+                                                                                      'project, or '
+                                                                                      'ask the '
+                                                                                      'service '
+                                                                                      'operator to '
+                                                                                      'enable this '
+                                                                                      'project.',
+                                                                           'http_status': 403},
+               'oauth_token_is_missing_installation_bindings': {'message': 'Your sign-in token '
+                                                                           'does not contain valid '
+                                                                           'connection '
+                                                                           'information. Reconnect '
+                                                                           'and complete browser '
+                                                                           'authorization again. '
+                                                                           'If the problem '
+                                                                           'continues, contact '
+                                                                           'support and include '
+                                                                           'the request ID shown.',
+                                                                'http_status': 403},
+               'project_id_is_not_accepted_in_fixed_project_mode': {'message': 'This connection '
+                                                                               'can access only '
+                                                                               'the project '
+                                                                               'identified by '
+                                                                               'fixed_project_id '
+                                                                               'in the error '
+                                                                               'details. Remove '
+                                                                               'the project_id '
+                                                                               'argument or use '
+                                                                               'that project ID. '
+                                                                               'To access another '
+                                                                               'project, use a '
+                                                                               'connection '
+                                                                               'authorized for it.',
+                                                                    'http_status': 403,
+                                                                    'message_template': 'This '
+                                                                                        'connection '
+                                                                                        'can '
+                                                                                        'access '
+                                                                                        'only '
+                                                                                        'project '
+                                                                                        '{fixed_project_id}. '
+                                                                                        'Remove '
+                                                                                        'the '
+                                                                                        'project_id '
+                                                                                        'argument '
+                                                                                        'or use '
+                                                                                        'that '
+                                                                                        'project '
+                                                                                        'ID. To '
+                                                                                        'access '
+                                                                                        'another '
+                                                                                        'project, '
+                                                                                        'use a '
+                                                                                        'connection '
+                                                                                        'authorized '
+                                                                                        'for it.'},
+               'tool_does_not_use_a_project_scoped_central_token': {'message': "This tool's access "
+                                                                               'configuration is '
+                                                                               'incomplete. '
+                                                                               'Contact support '
+                                                                               'and include the '
+                                                                               'tool name and '
+                                                                               'request ID shown.',
+                                                                    'http_status': 403},
+               'this_tool_requires_oauth_or_an_explicit_local_development_access': {'message': 'Reconnect '
+                                                                                               'your '
+                                                                                               'Polygres '
+                                                                                               'MCP '
+                                                                                               'connection '
+                                                                                               'and '
+                                                                                               'complete '
+                                                                                               'browser '
+                                                                                               'sign-in, '
+                                                                                               'then '
+                                                                                               'try '
+                                                                                               'this '
+                                                                                               'tool '
+                                                                                               'again.',
+                                                                                    'http_status': 403},
+               'this_operation_requires_oauth_or_an_explicit_local_development_a': {'message': 'Reconnect '
+                                                                                               'your '
+                                                                                               'Polygres '
+                                                                                               'MCP '
+                                                                                               'connection '
+                                                                                               'and '
+                                                                                               'complete '
+                                                                                               'browser '
+                                                                                               'sign-in, '
+                                                                                               'then '
+                                                                                               'try '
+                                                                                               'this '
+                                                                                               'operation '
+                                                                                               'again.',
+                                                                                    'http_status': 403},
+               'local_tool_access_token_required': {'message': 'This tool needs a Polygres access '
+                                                               'token. Ask the local service '
+                                                               'operator to configure local '
+                                                               'authentication, then try again.',
+                                                    'http_status': 403},
+               'local_operation_access_token_required': {'message': 'This operation needs a '
+                                                                    'Polygres access token. Ask '
+                                                                    'the local service operator to '
+                                                                    'configure local '
+                                                                    'authentication, then try '
+                                                                    'again.',
+                                                         'http_status': 403}}},
+ {'code': 'MCP_VALIDATION_ERROR',
+  'family': 'mcp',
+  'category': 'validation',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 422,
+  'message': 'The tool arguments are invalid. Compare the supplied arguments with the tool input '
+             'schema and correct the field identified in the error details. If no field is '
+             'identified, check for missing required arguments, unexpected arguments, and '
+             'incorrect value types.',
+  'message_key': 'polygres.error.mcp_validation_error',
+  'safe_detail_fields': ['field',
+                         'limit',
+                         'constraint',
+                         'expected_type',
+                         'mode',
+                         'required_payload',
+                         'supplied_payloads',
+                         'operation_kind',
+                         'action',
+                         'direction'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 2,
+  'variants': {'query_must_contain_between_2_and_200_characters': {'message': 'query must contain '
+                                                                              'between 2 and 200 '
+                                                                              'characters',
+                                                                   'http_status': 422},
+               'limit_must_be_between_1_and_10': {'message': 'limit must be between 1 and 10',
+                                                  'http_status': 422},
+               'max_characters_must_be_between_1000_and_20000': {'message': 'max_characters must '
+                                                                            'be between 1000 and '
+                                                                            '20000',
+                                                                 'http_status': 422},
+               'unknown_public_document_id': {'message': 'No document was found for the supplied '
+                                                         'document_id. Call search_docs, then pass '
+                                                         'a returned document_id to get_doc.',
+                                              'http_status': 422},
+               'selected_operations_only_support_observation': {'message': 'This tool cannot '
+                                                                           'perform the action on '
+                                                                           'the operation type '
+                                                                           'identified in the '
+                                                                           'error details. Use '
+                                                                           'get_operation or '
+                                                                           'wait_for_operation to '
+                                                                           'check its status.',
+                                                                'http_status': 422,
+                                                                'message_template': 'This tool '
+                                                                                    'cannot '
+                                                                                    'perform '
+                                                                                    '{action} on a '
+                                                                                    '{operation_kind} '
+                                                                                    'operation. '
+                                                                                    'Use '
+                                                                                    'get_operation '
+                                                                                    'or '
+                                                                                    'wait_for_operation '
+                                                                                    'to check its '
+                                                                                    'status.'},
+               'source_credentials_must_be_entered_in_the_polygres_dashboard': {'message': 'source '
+                                                                                           'credentials '
+                                                                                           'must '
+                                                                                           'be '
+                                                                                           'entered '
+                                                                                           'in the '
+                                                                                           'Polygres '
+                                                                                           'dashboard',
+                                                                                'http_status': 422},
+               'timeout_seconds_must_be_between_1_and_30': {'message': 'timeout_seconds must be '
+                                                                       'between 1 and 30',
+                                                            'http_status': 422},
+               'poll_interval_seconds_must_be_between_0_5_and_5': {'message': 'poll_interval_seconds '
+                                                                              'must be between 0.5 '
+                                                                              'and 5',
+                                                                   'http_status': 422},
+               'import_operations_do_not_support_retry': {'message': 'An existing import cannot be '
+                                                                     'retried. Inspect the failed '
+                                                                     'import and correct the '
+                                                                     'reported problem. Before '
+                                                                     'starting a new import from '
+                                                                     "the dashboard's Import page, "
+                                                                     'check whether the failed '
+                                                                     'import already added any '
+                                                                     'data.',
+                                                          'http_status': 422},
+               'payload_exceeds_the_1_mib_mcp_limit': {'message': 'This request exceeds the 1 MiB '
+                                                                  'limit. Remove optional input '
+                                                                  'data that is not needed for the '
+                                                                  'operation. If the complete '
+                                                                  'request is required, contact '
+                                                                  'support and include the request '
+                                                                  'ID shown.',
+                                                       'http_status': 422},
+               'payload_exceeds_the_maximum_nesting_depth_of_12': {'message': 'The value '
+                                                                              'identified in the '
+                                                                              'error details is '
+                                                                              'nested more than 12 '
+                                                                              'levels deep. '
+                                                                              'Simplify its '
+                                                                              'nesting while '
+                                                                              'preserving the '
+                                                                              'structure required '
+                                                                              'by the tool. If '
+                                                                              'that structure '
+                                                                              'requires deeper '
+                                                                              'nesting, contact '
+                                                                              'support and include '
+                                                                              'the request ID '
+                                                                              'shown.',
+                                                                   'http_status': 422,
+                                                                   'message_template': 'The value '
+                                                                                       'at {field} '
+                                                                                       'is nested '
+                                                                                       'more than '
+                                                                                       '12 levels '
+                                                                                       'deep. '
+                                                                                       'Simplify '
+                                                                                       'its '
+                                                                                       'nesting '
+                                                                                       'while '
+                                                                                       'preserving '
+                                                                                       'the '
+                                                                                       'structure '
+                                                                                       'required '
+                                                                                       'by the '
+                                                                                       'tool. If '
+                                                                                       'that '
+                                                                                       'structure '
+                                                                                       'requires '
+                                                                                       'deeper '
+                                                                                       'nesting, '
+                                                                                       'contact '
+                                                                                       'support '
+                                                                                       'and '
+                                                                                       'include '
+                                                                                       'the '
+                                                                                       'request ID '
+                                                                                       'shown.'},
+               'provide_exactly_the_payload_matching_mode': {'message': 'The selected mode '
+                                                                        'requires the payload '
+                                                                        'named in required_payload '
+                                                                        'in the error details. '
+                                                                        'Provide that payload and '
+                                                                        'remove any other mode '
+                                                                        'payloads.',
+                                                             'http_status': 422,
+                                                             'message_template': 'Mode {mode} '
+                                                                                 'requires the '
+                                                                                 '{required_payload} '
+                                                                                 'payload. Provide '
+                                                                                 'that payload and '
+                                                                                 'remove any other '
+                                                                                 'mode payloads.'},
+               'idempotency_key_is_required_with_context_reconciliation': {'message': 'idempotency_key '
+                                                                                      'is required '
+                                                                                      'with '
+                                                                                      'Context '
+                                                                                      'reconciliation',
+                                                                           'http_status': 422},
+               'preflight_attempt_id_expected_selection_generation_and_confirmat': {'message': 'preflight_attempt_id, '
+                                                                                               'expected_selection_generation, '
+                                                                                               'and '
+                                                                                               'confirmations '
+                                                                                               'must '
+                                                                                               'be '
+                                                                                               'supplied '
+                                                                                               'together',
+                                                                                    'http_status': 422},
+               'payload_object_exceeds_512_fields': {'message': 'The object identified in the '
+                                                                'error details contains more than '
+                                                                '512 fields. Remove optional '
+                                                                'fields that are not needed for '
+                                                                'the operation. If all fields are '
+                                                                'required, contact support and '
+                                                                'include the request ID shown.',
+                                                     'http_status': 422,
+                                                     'message_template': 'The object at {field} '
+                                                                         'contains more than 512 '
+                                                                         'fields. Remove optional '
+                                                                         'fields that are not '
+                                                                         'needed for the '
+                                                                         'operation. If all fields '
+                                                                         'are required, contact '
+                                                                         'support and include the '
+                                                                         'request ID shown.'},
+               'payload_array_exceeds_10_000_items': {'message': 'The array identified in the '
+                                                                 'error details contains more than '
+                                                                 '10,000 items. Select fewer items '
+                                                                 'only if the tool supports acting '
+                                                                 'on that subset. If the complete '
+                                                                 'array is required, contact '
+                                                                 'support and include the request '
+                                                                 'ID shown.',
+                                                      'http_status': 422,
+                                                      'message_template': 'The array at {field} '
+                                                                          'contains more than '
+                                                                          '10,000 items. Select '
+                                                                          'fewer items only if the '
+                                                                          'tool supports acting on '
+                                                                          'that subset. If the '
+                                                                          'complete array is '
+                                                                          'required, contact '
+                                                                          'support and include the '
+                                                                          'request ID shown.'},
+               'payload_string_exceeds_100_000_characters': {'message': 'The text identified in '
+                                                                        'the error details exceeds '
+                                                                        '100,000 characters. '
+                                                                        'Shorten it only if the '
+                                                                        'shorter value meets your '
+                                                                        'needs. If the full text '
+                                                                        'is required, contact '
+                                                                        'support and include the '
+                                                                        'request ID shown.',
+                                                             'http_status': 422,
+                                                             'message_template': 'The text at '
+                                                                                 '{field} exceeds '
+                                                                                 '100,000 '
+                                                                                 'characters. '
+                                                                                 'Shorten it only '
+                                                                                 'if the shorter '
+                                                                                 'value meets your '
+                                                                                 'needs. If the '
+                                                                                 'full text is '
+                                                                                 'required, '
+                                                                                 'contact support '
+                                                                                 'and include the '
+                                                                                 'request ID '
+                                                                                 'shown.'},
+               'invalid_connection_parameters': {'message': 'This connection URL contains invalid '
+                                                            'parameters. Copy the complete '
+                                                            'connection URL for your intended '
+                                                            'project and access level from the '
+                                                            'Polygres dashboard, then reconnect.',
+                                                 'http_status': 400},
+               'tool_not_available': {'message': 'This tool is not available for the current MCP '
+                                                 'connection. List the available tools before '
+                                                 'retrying.',
+                                      'http_status': 404},
+               'argument_required': {'message': 'A required argument is missing. Supply the field '
+                                                'identified in the error details, using the format '
+                                                'shown in the tool input schema.',
+                                     'http_status': 422,
+                                     'message_template': 'The {field} argument is required. Supply '
+                                                         'it using the format shown in the tool '
+                                                         'input schema.'},
+               'argument_unexpected': {'message': 'An unexpected argument was supplied. Remove '
+                                                  'arguments that are not listed in the tool input '
+                                                  'schema, then try again.',
+                                       'http_status': 422},
+               'argument_type': {'message': 'An argument has the wrong value type. Set the field '
+                                            'identified in the error details to the expected_type '
+                                            'shown there, then try again.',
+                                 'http_status': 422,
+                                 'message_template': 'The {field} argument has the wrong type. Use '
+                                                     'a value of type {expected_type}, then try '
+                                                     'again.'},
+               'argument_limit': {'message': 'An argument is outside its allowed range or size. '
+                                             'Adjust the field identified in the error details to '
+                                             'satisfy the constraint and limit shown there.',
+                                  'http_status': 422},
+               'argument_format': {'message': 'An argument has an invalid format or choice. Use '
+                                              'the format or allowed values specified for this '
+                                              'field in the tool input schema.',
+                                   'http_status': 422,
+                                   'message_template': 'The {field} argument has an invalid format '
+                                                       'or choice. Use the format or allowed '
+                                                       'values shown for that field in the tool '
+                                                       'input schema.'},
+               'output_invalid': {'message': 'This tool returned a response that does not match '
+                                             'its expected format. Contact support and include the '
+                                             'request ID shown. If this request changed data, '
+                                             'check its result before submitting it again.',
+                                  'http_status': 422},
+               'payload_exceeds_the_1_mib_mcp_limit_read': {'message': 'This tool returned data '
+                                                                       'exceeding the 1 MiB size '
+                                                                       'limit. Contact support and '
+                                                                       'include the request ID '
+                                                                       'shown.',
+                                                            'http_status': 422},
+               'payload_exceeds_the_1_mib_mcp_limit_write': {'message': 'The change may have '
+                                                                        'completed, but its '
+                                                                        'response exceeds the 1 '
+                                                                        'MiB size limit. Check the '
+                                                                        'affected record or '
+                                                                        'operation status before '
+                                                                        'submitting the change '
+                                                                        'again. If you cannot '
+                                                                        'confirm the result, '
+                                                                        'contact support and '
+                                                                        'include the request ID '
+                                                                        'shown.',
+                                                             'http_status': 422},
+               'payload_exceeds_the_maximum_nesting_depth_of_12_read': {'message': 'This tool '
+                                                                                   'returned data '
+                                                                                   'exceeding the '
+                                                                                   '12-level '
+                                                                                   'nesting limit. '
+                                                                                   'Contact '
+                                                                                   'support and '
+                                                                                   'include the '
+                                                                                   'request ID '
+                                                                                   'shown.',
+                                                                        'http_status': 422},
+               'payload_exceeds_the_maximum_nesting_depth_of_12_write': {'message': 'The change '
+                                                                                    'may have '
+                                                                                    'completed, '
+                                                                                    'but its '
+                                                                                    'response '
+                                                                                    'exceeds the '
+                                                                                    '12-level '
+                                                                                    'nesting '
+                                                                                    'limit. Check '
+                                                                                    'the affected '
+                                                                                    'record or '
+                                                                                    'operation '
+                                                                                    'status before '
+                                                                                    'submitting '
+                                                                                    'the change '
+                                                                                    'again. If you '
+                                                                                    'cannot '
+                                                                                    'confirm the '
+                                                                                    'result, '
+                                                                                    'contact '
+                                                                                    'support and '
+                                                                                    'include the '
+                                                                                    'request ID '
+                                                                                    'shown.',
+                                                                         'http_status': 422},
+               'payload_object_exceeds_512_fields_read': {'message': 'This tool returned data '
+                                                                     'exceeding the 512-field '
+                                                                     'object limit. Contact '
+                                                                     'support and include the '
+                                                                     'request ID shown.',
+                                                          'http_status': 422},
+               'payload_object_exceeds_512_fields_write': {'message': 'The change may have '
+                                                                      'completed, but its response '
+                                                                      'exceeds the 512-field '
+                                                                      'object limit. Check the '
+                                                                      'affected record or '
+                                                                      'operation status before '
+                                                                      'submitting the change '
+                                                                      'again. If you cannot '
+                                                                      'confirm the result, contact '
+                                                                      'support and include the '
+                                                                      'request ID shown.',
+                                                           'http_status': 422},
+               'payload_array_exceeds_10_000_items_read': {'message': 'This tool returned data '
+                                                                      'exceeding the 10,000-item '
+                                                                      'array limit. Contact '
+                                                                      'support and include the '
+                                                                      'request ID shown.',
+                                                           'http_status': 422},
+               'payload_array_exceeds_10_000_items_write': {'message': 'The change may have '
+                                                                       'completed, but its '
+                                                                       'response exceeds the '
+                                                                       '10,000-item array limit. '
+                                                                       'Check the affected record '
+                                                                       'or operation status before '
+                                                                       'submitting the change '
+                                                                       'again. If you cannot '
+                                                                       'confirm the result, '
+                                                                       'contact support and '
+                                                                       'include the request ID '
+                                                                       'shown.',
+                                                            'http_status': 422},
+               'payload_string_exceeds_100_000_characters_read': {'message': 'This tool returned '
+                                                                             'data exceeding the '
+                                                                             '100,000-character '
+                                                                             'text limit. Contact '
+                                                                             'support and include '
+                                                                             'the request ID '
+                                                                             'shown.',
+                                                                  'http_status': 422},
+               'payload_string_exceeds_100_000_characters_write': {'message': 'The change may have '
+                                                                              'completed, but its '
+                                                                              'response exceeds '
+                                                                              'the '
+                                                                              '100,000-character '
+                                                                              'text limit. Check '
+                                                                              'the affected record '
+                                                                              'or operation status '
+                                                                              'before submitting '
+                                                                              'the change again. '
+                                                                              'If you cannot '
+                                                                              'confirm the result, '
+                                                                              'contact support and '
+                                                                              'include the request '
+                                                                              'ID shown.',
+                                                                   'http_status': 422},
+               'payload_exceeds_the_1_mib_mcp_limit_page': {'message': 'The results exceed the 1 '
+                                                                       'MiB size limit. Reduce the '
+                                                                       'result limit identified in '
+                                                                       'the error details and try '
+                                                                       'the read again. If even '
+                                                                       'one result exceeds the '
+                                                                       'limit, contact support and '
+                                                                       'include the request ID '
+                                                                       'shown.',
+                                                            'http_status': 422,
+                                                            'message_template': 'The results '
+                                                                                'exceed the 1 MiB '
+                                                                                'size limit. '
+                                                                                'Reduce {field} '
+                                                                                'and try the read '
+                                                                                'again. If even '
+                                                                                'one result '
+                                                                                'exceeds the '
+                                                                                'limit, contact '
+                                                                                'support and '
+                                                                                'include the '
+                                                                                'request ID '
+                                                                                'shown.'},
+               'payload_array_exceeds_10_000_items_page': {'message': 'The results exceed the '
+                                                                      '10,000-item array limit. '
+                                                                      'Reduce the result limit '
+                                                                      'identified in the error '
+                                                                      'details and try the read '
+                                                                      'again. If even one result '
+                                                                      'exceeds the limit, contact '
+                                                                      'support and include the '
+                                                                      'request ID shown.',
+                                                           'http_status': 422,
+                                                           'message_template': 'The results exceed '
+                                                                               'the 10,000-item '
+                                                                               'array limit. '
+                                                                               'Reduce {field} and '
+                                                                               'try the read '
+                                                                               'again. If even one '
+                                                                               'result exceeds the '
+                                                                               'limit, contact '
+                                                                               'support and '
+                                                                               'include the '
+                                                                               'request ID shown.'},
+               'argument_at_least': {'message': 'An argument is outside its allowed range or size. '
+                                                'Adjust the field identified in the error details '
+                                                'to satisfy the constraint and limit shown there.',
+                                     'message_template': 'The {field} argument must be at least '
+                                                         '{limit}. Adjust it and try again.',
+                                     'http_status': 422},
+               'argument_greater_than': {'message': 'An argument is outside its allowed range or '
+                                                    'size. Adjust the field identified in the '
+                                                    'error details to satisfy the constraint and '
+                                                    'limit shown there.',
+                                         'message_template': 'The {field} argument must be greater '
+                                                             'than {limit}. Adjust it and try '
+                                                             'again.',
+                                         'http_status': 422},
+               'argument_at_most': {'message': 'An argument is outside its allowed range or size. '
+                                               'Adjust the field identified in the error details '
+                                               'to satisfy the constraint and limit shown there.',
+                                    'message_template': 'The {field} argument must be at most '
+                                                        '{limit}. Adjust it and try again.',
+                                    'http_status': 422},
+               'argument_less_than': {'message': 'An argument is outside its allowed range or '
+                                                 'size. Adjust the field identified in the error '
+                                                 'details to satisfy the constraint and limit '
+                                                 'shown there.',
+                                      'message_template': 'The {field} argument must be less than '
+                                                          '{limit}. Adjust it and try again.',
+                                      'http_status': 422},
+               'argument_minimum_length': {'message': 'An argument is outside its allowed range or '
+                                                      'size. Adjust the field identified in the '
+                                                      'error details to satisfy the constraint and '
+                                                      'limit shown there.',
+                                           'message_template': 'The {field} argument must have a '
+                                                               'length of at least {limit}. Adjust '
+                                                               'it and try again.',
+                                           'http_status': 422},
+               'argument_maximum_length': {'message': 'An argument is outside its allowed range or '
+                                                      'size. Adjust the field identified in the '
+                                                      'error details to satisfy the constraint and '
+                                                      'limit shown there.',
+                                           'message_template': 'The {field} argument must have a '
+                                                               'length of at most {limit}. Adjust '
+                                                               'it and try again.',
+                                           'http_status': 422},
+               'argument_multiple_of': {'message': 'An argument is outside its allowed range or '
+                                                   'size. Adjust the field identified in the error '
+                                                   'details to satisfy the constraint and limit '
+                                                   'shown there.',
+                                        'message_template': 'The {field} argument must be a '
+                                                            'multiple of {limit}. Adjust it and '
+                                                            'try again.',
+                                        'http_status': 422}}},
  {'code': 'METRICS_AZURE_AUTH_FAILED',
   'family': 'metrics',
   'category': 'dependency',
@@ -5898,6 +7436,22 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'retry_class': 'after_user_action',
   'reset_class': 'none',
   'cli_exit_code': 2,
+  'variants': {}},
+ {'code': 'PAID_PROJECT_PRICE_CHANGED',
+  'family': 'billing',
+  'category': 'conflict',
+  'kind': ['public', 'persisted_operation'],
+  'visibility': 'public',
+  'http_status': 409,
+  'message': 'Paid project pricing changed. Review the updated price before confirming again.',
+  'message_key': 'polygres.error.paid_project_price_changed',
+  'safe_detail_fields': ['confirmed_price_version_id',
+                         'current_price_version_id',
+                         'confirmed_maximum_first_cycle_cents',
+                         'current_first_cycle_cents'],
+  'retry_class': 'after_user_action',
+  'reset_class': 'none',
+  'cli_exit_code': 4,
   'variants': {}},
  {'code': 'PARTIAL_INDEX_PREDICATE_UNSUPPORTED',
   'family': 'core',
@@ -8053,11 +9607,14 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'http_status': 500,
   'message': 'Shared database bootstrap passwords are required.',
   'message_key': 'polygres.error.shared_database_bootstrap_invalid',
-  'safe_detail_fields': [],
+  'safe_detail_fields': ['database', 'expected_owner'],
   'retry_class': 'after_delay',
   'reset_class': 'none',
   'cli_exit_code': 8,
-  'variants': {'postgres_did_not_return_valid_quoted': {'message': 'Postgres did not return a '
+  'variants': {'existing_database_owner_mismatch': {'message': 'An existing shared database has an '
+                                                               'unexpected owner.',
+                                                    'http_status': 500},
+               'postgres_did_not_return_valid_quoted': {'message': 'Postgres did not return a '
                                                                    'valid quoted password literal.',
                                                         'http_status': 500},
                'shared_database_bootstrap_passwords_must_be': {'message': 'Shared database '
@@ -8593,6 +10150,19 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'retry_class': 'after_delay',
   'reset_class': 'none',
   'cli_exit_code': 8,
+  'variants': {}},
+ {'code': 'STRIPE_WEBHOOK_INVALID',
+  'family': 'billing',
+  'category': 'validation',
+  'kind': ['public'],
+  'visibility': 'operator',
+  'http_status': 400,
+  'message': 'The Stripe webhook could not be verified.',
+  'message_key': 'polygres.error.stripe_webhook_invalid',
+  'safe_detail_fields': [],
+  'retry_class': 'never',
+  'reset_class': 'none',
+  'cli_exit_code': 2,
   'variants': {}},
  {'code': 'SYNCED_PROJECT_SURFACE_UNAVAILABLE',
   'family': 'sync',
@@ -9287,7 +10857,8 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'kind': ['public', 'persisted_operation'],
   'visibility': 'public',
   'http_status': 409,
-  'message': 'Tier project limit exceeded.',
+  'message': 'Each organization can have one Free Nano project. To continue, create a Basic '
+             'project, or delete or upgrade the existing Nano project.',
   'message_key': 'polygres.error.tier_project_limit_exceeded',
   'safe_detail_fields': [],
   'retry_class': 'after_user_action',
@@ -9374,6 +10945,19 @@ ERROR_CATALOG_DATA: tuple[dict[str, object], ...] = tuple([{'code': 'ACCOUNT_CRE
   'retry_class': 'after_user_action',
   'reset_class': 'none',
   'cli_exit_code': 2,
+  'variants': {}},
+ {'code': 'UPSTREAM_ERROR',
+  'family': 'mcp',
+  'category': 'dependency',
+  'kind': ['public'],
+  'visibility': 'public',
+  'http_status': 502,
+  'message': 'The upstream request failed. Contact support with the request ID.',
+  'message_key': 'polygres.error.upstream_error',
+  'safe_detail_fields': [],
+  'retry_class': 'never',
+  'reset_class': 'none',
+  'cli_exit_code': 8,
   'variants': {}},
  {'code': 'USER_NOT_FOUND',
   'family': 'core',

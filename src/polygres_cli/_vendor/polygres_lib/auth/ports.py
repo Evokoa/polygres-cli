@@ -234,7 +234,17 @@ class CliAuthStore(Protocol):
 
     async def approve_login_session(
         self, *, session_id: str, principal: UserPrincipal, now: datetime
-    ) -> CliLoginState: ...
+    ) -> CliLoginState:
+        """Atomically approve or acknowledge an unexpired approval by this subject.
+
+        Return APPROVED for a pending-to-approved transition or a repeat by the
+        original approved_subject_id in APPROVED/CONSUMED state. A repeat must
+        preserve stored state, approval evidence, credentials, and expiry.
+        Reject missing, expired, denied, and different-subject sessions without
+        returning APPROVED. The return value acknowledges the decision, not a
+        transition back from CONSUMED to APPROVED.
+        """
+        ...
 
     async def deny_login_session(self, *, session_id: str, now: datetime) -> CliLoginState: ...
 

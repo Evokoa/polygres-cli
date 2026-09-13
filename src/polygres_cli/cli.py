@@ -289,6 +289,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_notices_parser(subparsers)
     _add_api_parsers(subparsers)
     _add_context_parsers(subparsers)
+    from polygres_cli.embedding_commands import add_parsers as add_embedding_parsers
+
+    add_embedding_parsers(subparsers)
     _add_rows_parsers(subparsers)
     _add_config_parsers(subparsers)
     return parser
@@ -362,6 +365,7 @@ def _command_name(args: argparse.Namespace) -> str:
         "kind",
         "api_action",
         "context_action",
+        "embedding_action",
         "rows_action",
         "sources_action",
         "collections_action",
@@ -918,7 +922,7 @@ def _add_context_parsers(
     recall = sub.add_parser("recall-check", help="compare HNSW results with exact retrieval")
     recall.add_argument("collection")
     recall.add_argument("--minimum-recall", type=_context_finite_float)
-    _add_context_ranked_flags(recall, filters=True)
+    _add_context_ranked_flags(recall, filters=True, text_input=False)
     recall.set_defaults(func=handle_context_recall_check)
 
 
@@ -998,11 +1002,19 @@ def _add_context_ranked_flags(
     parser: argparse.ArgumentParser,
     *,
     filters: bool = False,
+    text_input: bool = True,
 ) -> None:
     parser.add_argument("--request")
     embedding = parser.add_mutually_exclusive_group()
     embedding.add_argument("--embedding-json")
     embedding.add_argument("--embedding-file")
+    parser.add_argument("--vector-name")
+    if text_input:
+        embedding.add_argument("--text", help="generate a query vector from text")
+        embedding.add_argument("--text-file", help="UTF-8 query text file, or - for stdin")
+        parser.add_argument("--use-credits", action="store_true", default=None)
+        parser.add_argument("--idempotency-key")
+        parser.add_argument("--timeout", type=_timeout_seconds)
     parser.add_argument("--limit", type=_context_ranked_limit)
     if filters:
         _add_context_filter_flags(parser)
@@ -2776,7 +2788,7 @@ def handle_context_rank_fusion(ctx: Context, args: argparse.Namespace) -> int:
 def handle_context_joint(ctx: Context, args: argparse.Namespace) -> int:
     request = _context_joint_payload(args)
     project_id = _resolve_project_id(ctx, None)
-    payload = ctx.client.context_joint(project_id, request)
+    payload = ctx.client.context_joint(project_id, request, **_context_query_options(args, request))
     _context_reject_ranked_cursor(payload)
     response = context_response_model(ContextJointResponse, payload)
     if ctx.json:
@@ -2812,7 +2824,7 @@ def _context_ranked_request(
         "rank_fusion": ctx.client.context_rank_fusion,
         "grouped_search": ctx.client.context_grouped_search,
     }[mode]
-    payload = method(project_id, request)
+    payload = method(project_id, request, **_context_query_options(args, request))
     _context_reject_ranked_cursor(payload)
     if payload.get("mode") == "joint":
         raise CliError(
@@ -2967,6 +2979,69 @@ def _context_collection_create_request(args: argparse.Namespace) -> dict[str, An
     return context_model_payload(CollectionCreateRequest, request)
 
 
+def _context_semantic_input(args: argparse.Namespace, *, query_fallback: bool = False) -> dict:
+    embedding_json = getattr(args, "embedding_json", None)
+    embedding_file = getattr(args, "embedding_file", None)
+    text = getattr(args, "text", None)
+    text_file = getattr(args, "text_file", None)
+    supplied = sum(value is not None for value in (embedding_json, embedding_file, text, text_file))
+    if supplied == 0 and query_fallback:
+        text = args.query
+        supplied = int(text is not None)
+    if supplied != 1:
+        raise CliError(
+            "CONTEXT_EMBEDDING_INVALID",
+            "Provide exactly one embedding or text input.",
+            exit_code=USAGE,
+        )
+    if text_file is not None:
+        try:
+            text = sys.stdin.read() if text_file == "-" else Path(text_file).read_text("utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise CliError(
+                "CONTEXT_REQUEST_FILE_INVALID", "Could not read UTF-8 query text.", exit_code=USAGE
+            ) from exc
+    if text is not None:
+        payload = {"text": text, "use_credits": bool(args.use_credits)}
+    else:
+        embedding = context_read_array(
+            embedding_json if embedding_json is not None else embedding_file,
+            file_input=embedding_file is not None,
+        )
+        payload = {"embedding": context_validate_embedding(embedding)}
+        if getattr(args, "use_credits", False):
+            raise CliError(
+                "CONTEXT_REQUEST_INVALID", "--use-credits requires text input.", exit_code=USAGE
+            )
+    if args.vector_name is not None:
+        payload["vector_name"] = args.vector_name
+    return payload
+
+
+def _context_query_payload(model: type[Any], request: dict[str, Any]) -> dict[str, Any]:
+    payload = context_model_payload(model, request)
+    # Preserve pre-0.5.0 vector request bodies, including their existing null fields.
+    if payload.get("text") is None:
+        payload.pop("text", None)
+        payload.pop("use_credits", None)
+    else:
+        payload.pop("embedding", None)
+    return payload
+
+
+def _context_query_options(args: argparse.Namespace, payload: dict[str, Any]) -> dict[str, Any]:
+    options = {}
+    if args.timeout is not None:
+        options["timeout"] = args.timeout
+    if payload.get("text") is not None:
+        options["idempotency_key"] = context_idempotency_key(args.idempotency_key)
+    elif args.idempotency_key is not None:
+        raise CliError(
+            "CONTEXT_REQUEST_INVALID", "--idempotency-key requires text input.", exit_code=USAGE
+        )
+    return options
+
+
 def _context_ranked_payload(
     args: argparse.Namespace,
     model: type[Any],
@@ -2976,6 +3051,10 @@ def _context_ranked_payload(
         body_fields = (
             "embedding_json",
             "embedding_file",
+            "text",
+            "text_file",
+            "vector_name",
+            "use_credits",
             "limit",
             "filter_json",
             "filter_file",
@@ -3024,23 +3103,11 @@ def _context_ranked_payload(
                 "The request query must contain non-whitespace text.",
                 exit_code=USAGE,
             )
-        return context_model_payload(model, request)
+        return _context_query_payload(model, request)
 
-    embedding_json = getattr(args, "embedding_json", None)
-    embedding_file = getattr(args, "embedding_file", None)
-    if (embedding_json is None) == (embedding_file is None):
-        raise CliError(
-            "CONTEXT_EMBEDDING_INVALID",
-            "Provide exactly one of --embedding-json or --embedding-file.",
-            exit_code=USAGE,
-        )
-    embedding = context_read_array(
-        embedding_json if embedding_json is not None else embedding_file,
-        file_input=embedding_file is not None,
-    )
     request: dict[str, Any] = {
         "collection": args.collection,
-        "embedding": context_validate_embedding(embedding),
+        **_context_semantic_input(args, query_fallback=mode == "text_hybrid"),
         "limit": args.limit or 10,
     }
     if hasattr(args, "filter_json"):
@@ -3096,7 +3163,7 @@ def _context_ranked_payload(
         request["minimum_recall"] = context_validate_recall(
             0.95 if args.minimum_recall is None else args.minimum_recall
         )
-    return context_model_payload(model, request)
+    return _context_query_payload(model, request)
 
 
 def _context_joint_payload(args: argparse.Namespace) -> dict[str, Any]:
@@ -3104,6 +3171,10 @@ def _context_joint_payload(args: argparse.Namespace) -> dict[str, Any]:
         body_fields = (
             "embedding_json",
             "embedding_file",
+            "text",
+            "text_file",
+            "vector_name",
+            "use_credits",
             "limit",
             "filter_json",
             "filter_file",
@@ -3123,7 +3194,7 @@ def _context_joint_payload(args: argparse.Namespace) -> dict[str, Any]:
         conflicts = [
             name
             for name in body_fields
-            if getattr(args, name) is not None and getattr(args, name) != []
+            if getattr(args, name, None) is not None and getattr(args, name) != []
         ]
         if conflicts:
             raise CliError(
@@ -3142,20 +3213,8 @@ def _context_joint_payload(args: argparse.Namespace) -> dict[str, Any]:
         request["collection"] = args.collection
         if request.get("direction") == "both":
             request["direction"] = "any"
-        return context_model_payload(JointSearchRequest, request)
+        return _context_query_payload(JointSearchRequest, request)
 
-    embedding_json = args.embedding_json
-    embedding_file = args.embedding_file
-    if (embedding_json is None) == (embedding_file is None):
-        raise CliError(
-            "CONTEXT_EMBEDDING_INVALID",
-            "Provide exactly one of --embedding-json or --embedding-file.",
-            exit_code=USAGE,
-        )
-    embedding = context_read_array(
-        embedding_json if embedding_json is not None else embedding_file,
-        file_input=embedding_file is not None,
-    )
     starts = [
         context_read_object(value, file_input=False, code="CONTEXT_REQUEST_INVALID")
         for value in args.start_json
@@ -3166,7 +3225,7 @@ def _context_joint_payload(args: argparse.Namespace) -> dict[str, Any]:
     context_validate_joint_weights(semantic_weight, lexical_weight, graph_weight)
     request = {
         "collection": args.collection,
-        "embedding": context_validate_embedding(embedding),
+        **_context_semantic_input(args),
         "query": args.query,
         "starts": starts,
         "filter": _context_filter_input(args),
@@ -3184,7 +3243,7 @@ def _context_joint_payload(args: argparse.Namespace) -> dict[str, Any]:
         },
         "limit": args.limit or 10,
     }
-    return context_model_payload(JointSearchRequest, request)
+    return _context_query_payload(JointSearchRequest, request)
 
 
 def _context_filter_input(args: argparse.Namespace) -> dict[str, Any] | None:
@@ -3628,7 +3687,7 @@ def _sync_create_selections(
         for table in available_tables
         if table.get("schema_name") == "public"
         and table.get("eligible") is True
-        and (isinstance(table.get("sync_key"), dict) or bool(table.get("sync_key_candidates")))
+        and isinstance(table.get("sync_key"), dict)
     ]
     if not selectable:
         raise CliError(
@@ -3807,9 +3866,6 @@ def _sync_table_key_summary(table: dict[str, Any]) -> str:
         if isinstance(columns, list):
             return f"{sync_key.get('kind', 'key')} ({', '.join(str(value) for value in columns)})"
         return str(sync_key.get("kind") or "key")
-    candidates = table.get("sync_key_candidates")
-    if isinstance(candidates, list) and candidates:
-        return f"{len(candidates)} unique candidate(s)"
     return ""
 
 

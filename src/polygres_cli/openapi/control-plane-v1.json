@@ -158,6 +158,40 @@
         "title": "BackfillPointsRequest",
         "type": "object"
       },
+      "BasicUpgradeCapacityRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "configured_context_capacity": {
+            "default": 200000,
+            "maximum": 4000000.0,
+            "minimum": 200000.0,
+            "title": "Configured Context Capacity",
+            "type": "integer"
+          },
+          "configured_graph_capacity": {
+            "default": 200000,
+            "maximum": 4000000.0,
+            "minimum": 200000.0,
+            "title": "Configured Graph Capacity",
+            "type": "integer"
+          },
+          "configured_storage_gib": {
+            "default": 2,
+            "maximum": 128.0,
+            "minimum": 2.0,
+            "title": "Configured Storage Gib",
+            "type": "integer"
+          },
+          "quote_confirmation": {
+            "$ref": "#/components/schemas/ProjectQuoteConfirmationRequest"
+          }
+        },
+        "required": [
+          "quote_confirmation"
+        ],
+        "title": "BasicUpgradeCapacityRequest",
+        "type": "object"
+      },
       "BulkPointKeysRequest": {
         "additionalProperties": false,
         "properties": {
@@ -204,11 +238,18 @@
             "type": "string"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "filter": {
             "anyOf": [
@@ -229,6 +270,24 @@
             "title": "Limit",
             "type": "integer"
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
+          },
           "vector_name": {
             "anyOf": [
               {
@@ -243,7 +302,6 @@
         },
         "required": [
           "collection",
-          "embedding",
           "candidate_point_ids"
         ],
         "title": "CandidateSearchRequest",
@@ -387,6 +445,16 @@
             ],
             "title": "Grouped Search Blocker Message"
           },
+          "hnsw_record_limits": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HnswRecordLimits"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "joint": {
             "title": "Joint",
             "type": "boolean"
@@ -510,6 +578,11 @@
             "const": "preview",
             "title": "Product Status",
             "type": "string"
+          },
+          "query_embedding_generation": {
+            "default": false,
+            "title": "Query Embedding Generation",
+            "type": "boolean"
           },
           "rank_fusion": {
             "title": "Rank Fusion",
@@ -703,6 +776,112 @@
           "max_point_keys_per_operation"
         ],
         "title": "CapabilitiesResponse",
+        "type": "object"
+      },
+      "CapacityActivationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "configuration_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Configuration Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "configuration_id",
+          "completed_at"
+        ],
+        "title": "CapacityActivationRequest",
+        "type": "object"
+      },
+      "CapacityBannerDismissRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "configuration_version": {
+            "minimum": 1.0,
+            "title": "Configuration Version",
+            "type": "integer"
+          },
+          "dimension": {
+            "pattern": "^(context|graph)$",
+            "title": "Dimension",
+            "type": "string"
+          },
+          "severity": {
+            "pattern": "^(approaching|grace|paused)$",
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "configuration_version",
+          "dimension",
+          "severity"
+        ],
+        "title": "CapacityBannerDismissRequest",
+        "type": "object"
+      },
+      "CapacityChangeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "configured_context_capacity": {
+            "maximum": 4000000.0,
+            "minimum": 200000.0,
+            "title": "Configured Context Capacity",
+            "type": "integer"
+          },
+          "configured_graph_capacity": {
+            "maximum": 4000000.0,
+            "minimum": 200000.0,
+            "title": "Configured Graph Capacity",
+            "type": "integer"
+          },
+          "configured_storage_gib": {
+            "maximum": 128.0,
+            "minimum": 2.0,
+            "title": "Configured Storage Gib",
+            "type": "integer"
+          },
+          "confirmed_price_version_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Confirmed Price Version Id",
+            "type": "string"
+          },
+          "maximum_amount_due_now_cents": {
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Maximum Amount Due Now Cents",
+            "type": "integer"
+          },
+          "quote_id": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Id"
+          }
+        },
+        "required": [
+          "configured_storage_gib",
+          "configured_context_capacity",
+          "configured_graph_capacity",
+          "confirmed_price_version_id",
+          "maximum_amount_due_now_cents"
+        ],
+        "title": "CapacityChangeRequest",
         "type": "object"
       },
       "ClearPayloadRequest": {
@@ -1814,6 +1993,16 @@
             },
             "title": "Jsonb Filter Paths",
             "type": "array"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "last_error_code": {
             "anyOf": [
@@ -3126,6 +3315,19 @@
             ],
             "title": "Query Vectors"
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
           "text_column": {
             "anyOf": [
               {
@@ -3735,6 +3937,95 @@
         "title": "CreateEmbeddingMigrationRequest",
         "type": "object"
       },
+      "CreditAdjustmentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 9.223372036854776e+18,
+            "title": "Amount",
+            "type": "integer"
+          },
+          "operation": {
+            "enum": [
+              "grant",
+              "deduct"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          }
+        },
+        "required": [
+          "operation",
+          "amount",
+          "reason"
+        ],
+        "title": "CreditAdjustmentRequest",
+        "type": "object"
+      },
+      "CreditSpendingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cycle_credit_limit": {
+            "maximum": 1000000000.0,
+            "minimum": 0.0,
+            "title": "Cycle Credit Limit",
+            "type": "integer"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "cycle_credit_limit"
+        ],
+        "title": "CreditSpendingRequest",
+        "type": "object"
+      },
+      "CreditTopUpCheckoutRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_cents": {
+            "maximum": 2147483647.0,
+            "minimum": 1000.0,
+            "title": "Amount Cents",
+            "type": "integer"
+          },
+          "offer_version_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Offer Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "offer_version_id",
+          "amount_cents"
+        ],
+        "title": "CreditTopUpCheckoutRequest",
+        "type": "object"
+      },
       "CsvUploadCompleteRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3942,11 +4233,18 @@
             "type": "string"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "filter": {
             "anyOf": [
@@ -3967,6 +4265,24 @@
             "title": "Limit",
             "type": "integer"
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
+          },
           "vector_name": {
             "anyOf": [
               {
@@ -3980,8 +4296,7 @@
           }
         },
         "required": [
-          "collection",
-          "embedding"
+          "collection"
         ],
         "title": "DenseSearchRequest",
         "type": "object"
@@ -4459,6 +4774,42 @@
           "id"
         ],
         "title": "EntityRef",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "additionalProperties": true,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details"
+        ],
+        "title": "ErrorBody",
         "type": "object"
       },
       "ExistingTextTsvectorSetupRequest": {
@@ -4981,11 +5332,18 @@
             "default": "any"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "filter": {
             "anyOf": [
@@ -5031,6 +5389,24 @@
           "start": {
             "$ref": "#/components/schemas/GraphStart"
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
+          },
           "vector_name": {
             "anyOf": [
               {
@@ -5045,7 +5421,6 @@
         },
         "required": [
           "collection",
-          "embedding",
           "start"
         ],
         "title": "GraphFirstSearchRequest",
@@ -5387,11 +5762,18 @@
             "type": "string"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "group_by": {
             "title": "Group By",
@@ -5411,6 +5793,24 @@
             "title": "Limit",
             "type": "integer"
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
+          },
           "vector_name": {
             "anyOf": [
               {
@@ -5425,7 +5825,6 @@
         },
         "required": [
           "collection",
-          "embedding",
           "group_by"
         ],
         "title": "GroupedSearchRequest",
@@ -5442,6 +5841,40 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HnswRecordLimits": {
+        "additionalProperties": true,
+        "properties": {
+          "base_overhead_bytes": {
+            "title": "Base Overhead Bytes",
+            "type": "integer"
+          },
+          "dimension_bytes": {
+            "title": "Dimension Bytes",
+            "type": "integer"
+          },
+          "hnsw_m": {
+            "title": "Hnsw M",
+            "type": "integer"
+          },
+          "max_record_bytes": {
+            "title": "Max Record Bytes",
+            "type": "integer"
+          },
+          "pgcontext_version": {
+            "title": "Pgcontext Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pgcontext_version",
+          "max_record_bytes",
+          "dimension_bytes",
+          "base_overhead_bytes",
+          "hnsw_m"
+        ],
+        "title": "HnswRecordLimits",
         "type": "object"
       },
       "HybridRequest": {
@@ -5481,11 +5914,18 @@
             "type": "string"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "filters": {
             "additionalProperties": true,
@@ -5523,6 +5963,24 @@
               }
             ]
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
+          },
           "vector_limit": {
             "default": 20,
             "maximum": 1000.0,
@@ -5545,9 +6003,6 @@
             "title": "Weights"
           }
         },
-        "required": [
-          "embedding"
-        ],
         "title": "HybridRequest",
         "type": "object"
       },
@@ -6018,11 +6473,18 @@
             "default": "any"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "filter": {
             "anyOf": [
@@ -6091,12 +6553,30 @@
             "title": "Starts",
             "type": "array"
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
           "traversal_limit": {
             "default": 500,
             "maximum": 1000.0,
             "minimum": 1.0,
             "title": "Traversal Limit",
             "type": "integer"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
           },
           "vector_name": {
             "anyOf": [
@@ -6114,8 +6594,7 @@
           }
         },
         "required": [
-          "collection",
-          "embedding"
+          "collection"
         ],
         "title": "JointSearchRequest",
         "type": "object"
@@ -6311,6 +6790,261 @@
           "sql_body"
         ],
         "title": "MigrationCreateRequest",
+        "type": "object"
+      },
+      "ModelCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_env": {
+            "pattern": "^POLYGRES_EMBEDDING_[A-Z0-9_]+$",
+            "title": "Credential Env",
+            "type": "string"
+          },
+          "default_dimensions": {
+            "maximum": 4096.0,
+            "minimum": 1.0,
+            "title": "Default Dimensions",
+            "type": "integer"
+          },
+          "dimensions": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "endpoint": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "max_batch_inputs": {
+            "default": 64,
+            "maximum": 2048.0,
+            "minimum": 1.0,
+            "title": "Max Batch Inputs",
+            "type": "integer"
+          },
+          "max_batch_tokens": {
+            "default": 16384,
+            "maximum": 300000.0,
+            "minimum": 32.0,
+            "title": "Max Batch Tokens",
+            "type": "integer"
+          },
+          "max_input_tokens": {
+            "maximum": 32768.0,
+            "minimum": 32.0,
+            "title": "Max Input Tokens",
+            "type": "integer"
+          },
+          "microcredits_per_token": {
+            "anyOf": [
+              {
+                "maximum": 1000000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,23}0*$)\\d{0,10}\\.\\d{0,12}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Microcredits Per Token"
+          },
+          "model": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "price_version": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Price Version",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "qwen"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "query_settings": {
+            "additionalProperties": true,
+            "title": "Query Settings",
+            "type": "object"
+          },
+          "revision": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Revision",
+            "type": "string"
+          },
+          "source_settings": {
+            "additionalProperties": true,
+            "title": "Source Settings",
+            "type": "object"
+          },
+          "tokenizer": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Tokenizer",
+            "type": "string"
+          },
+          "tokenizer_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokenizer Sha256"
+          }
+        },
+        "required": [
+          "name",
+          "provider",
+          "model",
+          "revision",
+          "dimensions",
+          "default_dimensions",
+          "max_input_tokens",
+          "endpoint",
+          "credential_env",
+          "tokenizer",
+          "price_version",
+          "microcredits_per_token"
+        ],
+        "title": "ModelCreate",
+        "type": "object"
+      },
+      "ModelDeleteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "ModelDeleteRequest",
+        "type": "object"
+      },
+      "ModelPriceChange": {
+        "additionalProperties": false,
+        "properties": {
+          "price_version": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Price Version",
+            "type": "string"
+          },
+          "published_usd_per_million": {
+            "anyOf": [
+              {
+                "maximum": 10000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,12}0*$",
+                "type": "string"
+              }
+            ],
+            "title": "Published Usd Per Million"
+          },
+          "source_url": {
+            "maxLength": 2048,
+            "pattern": "^https://",
+            "title": "Source Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "price_version",
+          "published_usd_per_million",
+          "source_url"
+        ],
+        "title": "ModelPriceChange",
+        "type": "object"
+      },
+      "ModelProbeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "format": "uuid",
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "confirm_provider_charge": {
+            "const": true,
+            "title": "Confirm Provider Charge",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "confirm_provider_charge"
+        ],
+        "title": "ModelProbeRequest",
+        "type": "object"
+      },
+      "ModelStateChange": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "pricing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPriceChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "active",
+              "retired",
+              "disabled"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "expected_version"
+        ],
+        "title": "ModelStateChange",
         "type": "object"
       },
       "ModelVersionRow": {
@@ -6629,6 +7363,28 @@
         "title": "OrganizationSettingsUpdateRequest",
         "type": "object"
       },
+      "PaidProjectActivationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "provisioning_operation_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Provisioning Operation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed_at",
+          "provisioning_operation_id"
+        ],
+        "title": "PaidProjectActivationRequest",
+        "type": "object"
+      },
       "PayloadMutationResponse": {
         "additionalProperties": true,
         "properties": {
@@ -6668,6 +7424,22 @@
           "updated"
         ],
         "title": "PayloadMutationResult",
+        "type": "object"
+      },
+      "PaymentMethodSetupRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "setup_destination": {
+            "default": "billing",
+            "enum": [
+              "billing",
+              "new_project"
+            ],
+            "title": "Setup Destination",
+            "type": "string"
+          }
+        },
+        "title": "PaymentMethodSetupRequest",
         "type": "object"
       },
       "Permission": {
@@ -7472,9 +8244,58 @@
         "title": "PreflightResponse",
         "type": "object"
       },
+      "ProjectCapacitySelectionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "context_capacity": {
+            "maximum": 4000000.0,
+            "minimum": 100000.0,
+            "title": "Context Capacity",
+            "type": "integer"
+          },
+          "graph_capacity": {
+            "maximum": 4000000.0,
+            "minimum": 100000.0,
+            "title": "Graph Capacity",
+            "type": "integer"
+          },
+          "storage_mib": {
+            "maximum": 131072.0,
+            "minimum": 500.0,
+            "title": "Storage Mib",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "storage_mib",
+          "context_capacity",
+          "graph_capacity"
+        ],
+        "title": "ProjectCapacitySelectionRequest",
+        "type": "object"
+      },
+      "ProjectCheckoutRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "quote_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Quote Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quote_id"
+        ],
+        "title": "ProjectCheckoutRequest",
+        "type": "object"
+      },
       "ProjectCreateRequest": {
         "additionalProperties": false,
         "properties": {
+          "capacity_selection": {
+            "$ref": "#/components/schemas/ProjectCapacitySelectionRequest"
+          },
           "confirmations": {
             "anyOf": [
               {
@@ -7518,6 +8339,16 @@
           "project_type": {
             "$ref": "#/components/schemas/ProjectType",
             "default": "standard"
+          },
+          "quote_confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectQuoteConfirmationRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "selected_data_source": {
             "anyOf": [
@@ -7650,6 +8481,83 @@
         "title": "ProjectPreflightSelectionRequest",
         "type": "object"
       },
+      "ProjectQuoteCapacityRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "context_capacity": {
+            "maximum": 4000000.0,
+            "minimum": 200000.0,
+            "title": "Context Capacity",
+            "type": "integer"
+          },
+          "graph_capacity": {
+            "maximum": 4000000.0,
+            "minimum": 200000.0,
+            "title": "Graph Capacity",
+            "type": "integer"
+          },
+          "storage_gib": {
+            "maximum": 128.0,
+            "minimum": 2.0,
+            "title": "Storage Gib",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "storage_gib",
+          "context_capacity",
+          "graph_capacity"
+        ],
+        "title": "ProjectQuoteCapacityRequest",
+        "type": "object"
+      },
+      "ProjectQuoteConfirmationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "quote_id": {
+            "pattern": "^[0-9a-fA-F-]{36}$",
+            "title": "Quote Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quote_id"
+        ],
+        "title": "ProjectQuoteConfirmationRequest",
+        "type": "object"
+      },
+      "ProjectQuoteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "capacity": {
+            "$ref": "#/components/schemas/ProjectQuoteCapacityRequest"
+          },
+          "project_type": {
+            "enum": [
+              "standard",
+              "postgres_sync"
+            ],
+            "title": "Project Type",
+            "type": "string"
+          },
+          "source_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectDataSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "capacity",
+          "project_type"
+        ],
+        "title": "ProjectQuoteRequest",
+        "type": "object"
+      },
       "ProjectRenameRequest": {
         "additionalProperties": false,
         "properties": {
@@ -7690,6 +8598,19 @@
         ],
         "title": "ProjectType",
         "type": "string"
+      },
+      "ProjectUpgradeQuoteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "capacity": {
+            "$ref": "#/components/schemas/ProjectQuoteCapacityRequest"
+          }
+        },
+        "required": [
+          "capacity"
+        ],
+        "title": "ProjectUpgradeQuoteRequest",
+        "type": "object"
       },
       "QueryCohortStatsResponse": {
         "additionalProperties": true,
@@ -7822,6 +8743,11 @@
           },
           "plan": {
             "$ref": "#/components/schemas/ContextQueryPlan"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
           }
         },
         "required": [
@@ -8093,6 +9019,55 @@
         "title": "QueryExplainRow",
         "type": "object"
       },
+      "QuotaPolicyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "apply_immediately": {
+            "default": false,
+            "title": "Apply Immediately",
+            "type": "boolean"
+          },
+          "free_generation_microcredits": {
+            "maximum": 1000000000000.0,
+            "minimum": 0.0,
+            "title": "Free Generation Microcredits",
+            "type": "integer"
+          },
+          "free_query_microcredits": {
+            "maximum": 1000000000000.0,
+            "minimum": 0.0,
+            "title": "Free Query Microcredits",
+            "type": "integer"
+          },
+          "paid_generation_microcredits": {
+            "maximum": 1000000000000.0,
+            "minimum": 0.0,
+            "title": "Paid Generation Microcredits",
+            "type": "integer"
+          },
+          "paid_query_microcredits": {
+            "maximum": 1000000000000.0,
+            "minimum": 0.0,
+            "title": "Paid Query Microcredits",
+            "type": "integer"
+          },
+          "version": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "free_generation_microcredits",
+          "free_query_microcredits",
+          "paid_generation_microcredits",
+          "paid_query_microcredits"
+        ],
+        "title": "QuotaPolicyRequest",
+        "type": "object"
+      },
       "RankFusionSearchRequest": {
         "additionalProperties": false,
         "properties": {
@@ -8112,11 +9087,18 @@
             "default": "any"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "filter": {
             "anyOf": [
@@ -8162,6 +9144,24 @@
           "start": {
             "$ref": "#/components/schemas/GraphStart"
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
+          },
           "vector_name": {
             "anyOf": [
               {
@@ -8179,7 +9179,6 @@
         },
         "required": [
           "collection",
-          "embedding",
           "start"
         ],
         "title": "RankFusionSearchRequest",
@@ -8776,14 +9775,7 @@
         "additionalProperties": false,
         "properties": {
           "scope": {
-            "enum": [
-              "graph:read",
-              "graph:manage",
-              "rows:read",
-              "rows:write"
-            ],
-            "title": "Scope",
-            "type": "string"
+            "$ref": "#/components/schemas/RuntimeScope"
           }
         },
         "required": [
@@ -8877,6 +9869,24 @@
         ],
         "title": "RuntimeCapabilities",
         "type": "object"
+      },
+      "RuntimeScope": {
+        "enum": [
+          "graph:read",
+          "graph:manage",
+          "vector:read",
+          "vector:manage",
+          "text:read",
+          "text:manage",
+          "retrieval:read",
+          "hybrid:read",
+          "context:read",
+          "context:manage",
+          "rows:read",
+          "rows:write"
+        ],
+        "title": "RuntimeScope",
+        "type": "string"
       },
       "SdkNoticeResponse": {
         "properties": {
@@ -9179,6 +10189,19 @@
       "SyncTableReference": {
         "additionalProperties": false,
         "properties": {
+          "destination_key_index_name": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Key Index Name"
+          },
           "included_columns": {
             "anyOf": [
               {
@@ -9689,11 +10712,18 @@
             "type": "string"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "limit": {
             "default": 10,
@@ -9706,6 +10736,24 @@
             "minLength": 1,
             "title": "Query",
             "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
           },
           "vector_name": {
             "anyOf": [
@@ -9721,7 +10769,6 @@
         },
         "required": [
           "collection",
-          "embedding",
           "query"
         ],
         "title": "TextHybridSearchRequest",
@@ -9777,6 +10824,118 @@
         "title": "TextSearchRequest",
         "type": "object"
       },
+      "TopUpOfferVersionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "bonus_expires_after_days": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bonus Expires After Days"
+          },
+          "bonus_percentage": {
+            "minimum": 0.0,
+            "title": "Bonus Percentage",
+            "type": "integer"
+          },
+          "display_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "fixed_amount_cents": {
+            "anyOf": [
+              {
+                "minimum": 1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fixed Amount Cents"
+          },
+          "kind": {
+            "pattern": "^(fixed|custom)$",
+            "title": "Kind",
+            "type": "string"
+          },
+          "minimum_amount_cents": {
+            "default": 1000,
+            "minimum": 1000.0,
+            "title": "Minimum Amount Cents",
+            "type": "integer"
+          },
+          "offer_key": {
+            "maxLength": 50,
+            "minLength": 1,
+            "pattern": "^[a-z0-9_]+$",
+            "title": "Offer Key",
+            "type": "string"
+          },
+          "stripe_price_id": {
+            "anyOf": [
+              {
+                "pattern": "^price_[A-Za-z0-9]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stripe Price Id"
+          }
+        },
+        "required": [
+          "offer_key",
+          "kind",
+          "bonus_percentage",
+          "display_name"
+        ],
+        "title": "TopUpOfferVersionRequest",
+        "type": "object"
+      },
+      "TopUpReconciliationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "pattern": "^(retry_accounting|mark_resolved)$",
+            "title": "Action",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          }
+        },
+        "required": [
+          "action",
+          "reason"
+        ],
+        "title": "TopUpReconciliationRequest",
+        "type": "object"
+      },
       "UpdateEmbeddingMigrationRequest": {
         "additionalProperties": false,
         "properties": {
@@ -9801,6 +10960,48 @@
           "status"
         ],
         "title": "UpdateEmbeddingMigrationRequest",
+        "type": "object"
+      },
+      "UsageReconciliation": {
+        "additionalProperties": false,
+        "properties": {
+          "actual_tokens": {
+            "anyOf": [
+              {
+                "maximum": 10000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Tokens"
+          },
+          "evidence": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Evidence",
+            "type": "string"
+          },
+          "provider_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Request Id"
+          }
+        },
+        "required": [
+          "actual_tokens",
+          "evidence"
+        ],
+        "title": "UsageReconciliation",
         "type": "object"
       },
       "VacuumAdviceResponse": {
@@ -10178,11 +11379,18 @@
             "default": "any"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "filter": {
             "anyOf": [
@@ -10225,6 +11433,24 @@
             "title": "Relationship Types",
             "type": "array"
           },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
+          },
           "vector_name": {
             "anyOf": [
               {
@@ -10238,8 +11464,7 @@
           }
         },
         "required": [
-          "collection",
-          "embedding"
+          "collection"
         ],
         "title": "VectorFirstSearchRequest",
         "type": "object"
@@ -10270,11 +11495,18 @@
             "title": "Cursor"
           },
           "embedding": {
-            "items": {
-              "type": "number"
-            },
-            "title": "Embedding",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
           },
           "filters": {
             "additionalProperties": true,
@@ -10314,11 +11546,26 @@
               }
             ],
             "title": "Min Similarity"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 131072,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "use_credits": {
+            "default": false,
+            "title": "Use Credits",
+            "type": "boolean"
           }
         },
-        "required": [
-          "embedding"
-        ],
         "title": "VectorSearchRequest",
         "type": "object"
       },
@@ -10559,6 +11806,1022 @@
           }
         },
         "summary": "Readyz"
+      }
+    },
+    "/v1/admin/billing/top-up-offer-versions": {
+      "post": {
+        "operationId": "admin_create_top_up_offer_version_v1_admin_billing_top_up_offer_versions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopUpOfferVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin Create Top Up Offer Version V1 Admin Billing Top Up Offer Versions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Create Top Up Offer Version"
+      }
+    },
+    "/v1/admin/billing/top-up-offer-versions/{offer_version_id}/deactivate": {
+      "post": {
+        "operationId": "admin_deactivate_top_up_offer_version_v1_admin_billing_top_up_offer_versions__offer_version_id__deactivate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "offer_version_id",
+            "required": true,
+            "schema": {
+              "title": "Offer Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin Deactivate Top Up Offer Version V1 Admin Billing Top Up Offer Versions  Offer Version Id  Deactivate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Deactivate Top Up Offer Version"
+      }
+    },
+    "/v1/admin/billing/top-up-offers": {
+      "get": {
+        "operationId": "admin_list_top_up_offers_v1_admin_billing_top_up_offers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin List Top Up Offers V1 Admin Billing Top Up Offers Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Admin List Top Up Offers"
+      }
+    },
+    "/v1/admin/billing/top-up-purchases": {
+      "get": {
+        "operationId": "admin_list_top_up_purchases_v1_admin_billing_top_up_purchases_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "reconciliation_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Reconciliation Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin List Top Up Purchases V1 Admin Billing Top Up Purchases Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin List Top Up Purchases"
+      }
+    },
+    "/v1/admin/billing/top-up-purchases/{purchase_intent_id}": {
+      "get": {
+        "operationId": "admin_get_top_up_purchase_v1_admin_billing_top_up_purchases__purchase_intent_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "purchase_intent_id",
+            "required": true,
+            "schema": {
+              "title": "Purchase Intent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin Get Top Up Purchase V1 Admin Billing Top Up Purchases  Purchase Intent Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Get Top Up Purchase"
+      }
+    },
+    "/v1/admin/billing/top-up-purchases/{purchase_intent_id}/reconcile": {
+      "post": {
+        "operationId": "admin_reconcile_top_up_purchase_v1_admin_billing_top_up_purchases__purchase_intent_id__reconcile_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "purchase_intent_id",
+            "required": true,
+            "schema": {
+              "title": "Purchase Intent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopUpReconciliationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin Reconcile Top Up Purchase V1 Admin Billing Top Up Purchases  Purchase Intent Id  Reconcile Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Reconcile Top Up Purchase"
+      }
+    },
+    "/v1/admin/embeddings/models": {
+      "get": {
+        "operationId": "admin_embedding_models",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Admin Models",
+        "tags": [
+          "embeddings-admin"
+        ]
+      },
+      "post": {
+        "operationId": "admin_embedding_create_model",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Model",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
+    "/v1/admin/embeddings/models/{model_id}": {
+      "delete": {
+        "operationId": "admin_embedding_delete_model",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Model",
+        "tags": [
+          "embeddings-admin"
+        ]
+      },
+      "patch": {
+        "operationId": "admin_embedding_model_state",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelStateChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Model State",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
+    "/v1/admin/embeddings/models/{model_id}/impact": {
+      "get": {
+        "operationId": "admin_embedding_model_impact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Model Impact",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
+    "/v1/admin/embeddings/models/{model_id}/probe": {
+      "post": {
+        "operationId": "admin_embedding_probe_model",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelProbeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Probe Model",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
+    "/v1/admin/embeddings/quota-policy": {
+      "get": {
+        "operationId": "admin_embedding_get_quota",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Quota",
+        "tags": [
+          "embeddings-admin"
+        ]
+      },
+      "put": {
+        "operationId": "admin_embedding_set_quota",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Quota",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
+    "/v1/admin/embeddings/reconciliation": {
+      "get": {
+        "operationId": "admin_embedding_reconciliation_list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reconciliation List",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
+    "/v1/admin/embeddings/reconciliation/{attempt_id}": {
+      "post": {
+        "operationId": "admin_embedding_reconcile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsageReconciliation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reconcile Usage",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
+    "/v1/admin/organizations/{organization_id}/billing": {
+      "get": {
+        "operationId": "admin_get_organization_billing_v1_admin_organizations__organization_id__billing_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin Get Organization Billing V1 Admin Organizations  Organization Id  Billing Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Get Organization Billing"
+      }
+    },
+    "/v1/admin/organizations/{organization_id}/credit-adjustments": {
+      "post": {
+        "operationId": "adjust_organization_credits_v1_admin_organizations__organization_id__credit_adjustments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditAdjustmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Adjust Organization Credits V1 Admin Organizations  Organization Id  Credit Adjustments Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adjust Organization Credits"
+      }
+    },
+    "/v1/admin/organizations/{organization_id}/credits": {
+      "get": {
+        "operationId": "admin_get_organization_credits_v1_admin_organizations__organization_id__credits_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin Get Organization Credits V1 Admin Organizations  Organization Id  Credits Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Get Organization Credits"
+      }
+    },
+    "/v1/admin/organizations/{organization_id}/credits/ledger": {
+      "get": {
+        "operationId": "admin_list_organization_credit_ledger_v1_admin_organizations__organization_id__credits_ledger_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Admin List Organization Credit Ledger V1 Admin Organizations  Organization Id  Credits Ledger Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin List Organization Credit Ledger"
+      }
+    },
+    "/v1/admin/organizations/{organization_id}/projects/{project_id}/billing-activation": {
+      "post": {
+        "operationId": "activate_paid_project_billing_v1_admin_organizations__organization_id__projects__project_id__billing_activation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaidProjectActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Activate Paid Project Billing V1 Admin Organizations  Organization Id  Projects  Project Id  Billing Activation Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activate Paid Project Billing"
+      }
+    },
+    "/v1/admin/organizations/{organization_id}/projects/{project_id}/capacity-activation": {
+      "post": {
+        "operationId": "activate_project_capacity_v1_admin_organizations__organization_id__projects__project_id__capacity_activation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapacityActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Activate Project Capacity V1 Admin Organizations  Organization Id  Projects  Project Id  Capacity Activation Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activate Project Capacity"
       }
     },
     "/v1/admin/runtime-api-rollouts": {
@@ -11510,6 +13773,643 @@
         "summary": "Update Organization Settings"
       }
     },
+    "/v1/organizations/{organization_id}/billing": {
+      "get": {
+        "operationId": "get_organization_billing_v1_organizations__organization_id__billing_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "configured_storage_gib",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 128,
+                  "minimum": 2,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Configured Storage Gib"
+            }
+          },
+          {
+            "in": "query",
+            "name": "configured_context_capacity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 4000000,
+                  "minimum": 200000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Configured Context Capacity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "configured_graph_capacity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 4000000,
+                  "minimum": 200000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Configured Graph Capacity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Organization Billing V1 Organizations  Organization Id  Billing Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Organization Billing"
+      }
+    },
+    "/v1/organizations/{organization_id}/billing/payment-method-setup": {
+      "post": {
+        "operationId": "create_organization_payment_method_setup_v1_organizations__organization_id__billing_payment_method_setup_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PaymentMethodSetupRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Organization Payment Method Setup V1 Organizations  Organization Id  Billing Payment Method Setup Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Organization Payment Method Setup"
+      }
+    },
+    "/v1/organizations/{organization_id}/billing/portal": {
+      "post": {
+        "operationId": "create_organization_billing_portal_v1_organizations__organization_id__billing_portal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Organization Billing Portal V1 Organizations  Organization Id  Billing Portal Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Organization Billing Portal"
+      }
+    },
+    "/v1/organizations/{organization_id}/billing/project-checkout-sessions": {
+      "post": {
+        "operationId": "create_organization_project_checkout_v1_organizations__organization_id__billing_project_checkout_sessions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Organization Project Checkout V1 Organizations  Organization Id  Billing Project Checkout Sessions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Organization Project Checkout"
+      }
+    },
+    "/v1/organizations/{organization_id}/billing/project-quotes": {
+      "post": {
+        "operationId": "create_project_quote_v1_organizations__organization_id__billing_project_quotes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Project Quote V1 Organizations  Organization Id  Billing Project Quotes Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Project Quote"
+      }
+    },
+    "/v1/organizations/{organization_id}/billing/top-up-checkout-sessions": {
+      "post": {
+        "operationId": "create_organization_credit_top_up_checkout_v1_organizations__organization_id__billing_top_up_checkout_sessions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditTopUpCheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Organization Credit Top Up Checkout V1 Organizations  Organization Id  Billing Top Up Checkout Sessions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Organization Credit Top Up Checkout"
+      }
+    },
+    "/v1/organizations/{organization_id}/billing/top-up-offers": {
+      "get": {
+        "operationId": "list_organization_credit_top_up_offers_v1_organizations__organization_id__billing_top_up_offers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Organization Credit Top Up Offers V1 Organizations  Organization Id  Billing Top Up Offers Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Organization Credit Top Up Offers"
+      }
+    },
+    "/v1/organizations/{organization_id}/billing/top-up-purchases": {
+      "get": {
+        "operationId": "list_organization_credit_top_up_purchases_v1_organizations__organization_id__billing_top_up_purchases_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Organization Credit Top Up Purchases V1 Organizations  Organization Id  Billing Top Up Purchases Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Organization Credit Top Up Purchases"
+      }
+    },
+    "/v1/organizations/{organization_id}/billing/top-up-purchases/{purchase_intent_id}": {
+      "get": {
+        "operationId": "get_organization_credit_top_up_purchase_v1_organizations__organization_id__billing_top_up_purchases__purchase_intent_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "purchase_intent_id",
+            "required": true,
+            "schema": {
+              "title": "Purchase Intent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Organization Credit Top Up Purchase V1 Organizations  Organization Id  Billing Top Up Purchases  Purchase Intent Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Organization Credit Top Up Purchase"
+      }
+    },
+    "/v1/organizations/{organization_id}/credits": {
+      "get": {
+        "operationId": "get_organization_credits_v1_organizations__organization_id__credits_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Organization Credits V1 Organizations  Organization Id  Credits Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Organization Credits"
+      }
+    },
+    "/v1/organizations/{organization_id}/credits/ledger": {
+      "get": {
+        "operationId": "list_organization_credit_ledger_v1_organizations__organization_id__credits_ledger_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Organization Credit Ledger V1 Organizations  Organization Id  Credits Ledger Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Organization Credit Ledger"
+      }
+    },
     "/v1/organizations/{organization_id}/invitations": {
       "get": {
         "operationId": "list_invitations_v1_organizations__organization_id__invitations_get",
@@ -11896,6 +14796,300 @@
           }
         },
         "summary": "Update Member Role"
+      }
+    },
+    "/v1/organizations/{organization_id}/projects/{project_id}/capacity-changes": {
+      "post": {
+        "operationId": "create_project_capacity_change_v1_organizations__organization_id__projects__project_id__capacity_changes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapacityChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Project Capacity Change V1 Organizations  Organization Id  Projects  Project Id  Capacity Changes Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Project Capacity Change"
+      }
+    },
+    "/v1/organizations/{organization_id}/projects/{project_id}/capacity-changes/preview": {
+      "get": {
+        "operationId": "preview_project_capacity_change_v1_organizations__organization_id__projects__project_id__capacity_changes_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "configured_storage_gib",
+            "required": true,
+            "schema": {
+              "maximum": 128,
+              "minimum": 2,
+              "title": "Configured Storage Gib",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "configured_context_capacity",
+            "required": true,
+            "schema": {
+              "maximum": 4000000,
+              "minimum": 200000,
+              "title": "Configured Context Capacity",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "configured_graph_capacity",
+            "required": true,
+            "schema": {
+              "maximum": 4000000,
+              "minimum": 200000,
+              "title": "Configured Graph Capacity",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preview Project Capacity Change V1 Organizations  Organization Id  Projects  Project Id  Capacity Changes Preview Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Project Capacity Change"
+      }
+    },
+    "/v1/organizations/{organization_id}/projects/{project_id}/embeddings/credit-spending": {
+      "put": {
+        "operationId": "organization_embedding_credit_spending",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditSpendingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Credit Spending",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/organizations/{organization_id}/projects/{project_id}/upgrade-quotes": {
+      "post": {
+        "operationId": "create_project_upgrade_quote_v1_organizations__organization_id__projects__project_id__upgrade_quotes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpgradeQuoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Project Upgrade Quote V1 Organizations  Organization Id  Projects  Project Id  Upgrade Quotes Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Project Upgrade Quote"
+      }
+    },
+    "/v1/project-capacity-policy": {
+      "get": {
+        "operationId": "get_project_capacity_policy_v1_project_capacity_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Project Capacity Policy V1 Project Capacity Policy Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Project Capacity Policy"
       }
     },
     "/v1/project-creation-options": {
@@ -12665,6 +15859,251 @@
           }
         },
         "summary": "Revoke Api Key"
+      }
+    },
+    "/v1/projects/{project_id}/basic-upgrades": {
+      "post": {
+        "operationId": "create_basic_project_upgrade_v1_projects__project_id__basic_upgrades_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 255,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BasicUpgradeCapacityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Basic Project Upgrade V1 Projects  Project Id  Basic Upgrades Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Basic Project Upgrade"
+      }
+    },
+    "/v1/projects/{project_id}/basic-upgrades/current": {
+      "get": {
+        "operationId": "get_current_basic_project_upgrade_v1_projects__project_id__basic_upgrades_current_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Current Basic Project Upgrade V1 Projects  Project Id  Basic Upgrades Current Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Current Basic Project Upgrade"
+      }
+    },
+    "/v1/projects/{project_id}/basic-upgrades/{operation_id}": {
+      "get": {
+        "operationId": "get_basic_project_upgrade_v1_projects__project_id__basic_upgrades__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Basic Project Upgrade V1 Projects  Project Id  Basic Upgrades  Operation Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Basic Project Upgrade"
+      }
+    },
+    "/v1/projects/{project_id}/capacity": {
+      "get": {
+        "operationId": "get_project_capacity_v1_projects__project_id__capacity_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Project Capacity V1 Projects  Project Id  Capacity Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project Capacity"
+      }
+    },
+    "/v1/projects/{project_id}/capacity/dismiss": {
+      "post": {
+        "operationId": "dismiss_project_capacity_banner_v1_projects__project_id__capacity_dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapacityBannerDismissRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Dismiss Project Capacity Banner V1 Projects  Project Id  Capacity Dismiss Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Project Capacity Banner"
       }
     },
     "/v1/projects/{project_id}/connection-info": {
@@ -17310,6 +20749,535 @@
         ]
       }
     },
+    "/v1/projects/{project_id}/embeddings/configurations": {
+      "get": {
+        "operationId": "embedding_list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      },
+      "post": {
+        "operationId": "embedding_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/configurations/{configuration_id}": {
+      "delete": {
+        "operationId": "embedding_remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "configuration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Configuration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      },
+      "get": {
+        "operationId": "embedding_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "configuration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Configuration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      },
+      "patch": {
+        "operationId": "embedding_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "configuration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Configuration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/configurations/{configuration_id}/actions": {
+      "post": {
+        "operationId": "embedding_action",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "configuration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Configuration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/configurations/{configuration_id}/context": {
+      "get": {
+        "operationId": "embedding_context_handoff",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "configuration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Configuration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextErrorEnvelope"
+                }
+              }
+            },
+            "description": "Context request is invalid."
+          }
+        },
+        "security": [
+          {
+            "ContextBearerAuth": []
+          }
+        ],
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/models": {
+      "get": {
+        "operationId": "embedding_models",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/preview": {
+      "post": {
+        "operationId": "embedding_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/search": {
+      "post": {
+        "operationId": "embedding_search",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/sources": {
+      "get": {
+        "operationId": "embedding_sources",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/usage": {
+      "get": {
+        "operationId": "embedding_usage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
     "/v1/projects/{project_id}/graph/build": {
       "post": {
         "operationId": "build_graph_v1_projects__project_id__graph_build_post",
@@ -19270,6 +23238,47 @@
         "summary": "Get Project Status"
       }
     },
+    "/v1/projects/{project_id}/storage-usage": {
+      "get": {
+        "operationId": "get_project_storage_usage_v1_projects__project_id__storage_usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Project Storage Usage V1 Projects  Project Id  Storage Usage Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project Storage Usage"
+      }
+    },
     "/v1/projects/{project_id}/sync/credential-rotation": {
       "post": {
         "operationId": "rotate_sync_credential_v1_projects__project_id__sync_credential_rotation_post",
@@ -21108,6 +25117,47 @@
           }
         },
         "summary": "List Sdk Notices"
+      }
+    },
+    "/v1/stripe/webhooks": {
+      "post": {
+        "operationId": "receive_stripe_webhook_v1_stripe_webhooks_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Stripe-Signature",
+            "required": true,
+            "schema": {
+              "title": "Stripe-Signature",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Receive Stripe Webhook V1 Stripe Webhooks Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Receive Stripe Webhook"
       }
     },
     "/v1/tiers": {

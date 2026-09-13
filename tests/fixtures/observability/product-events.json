@@ -1,5 +1,5 @@
 {
-  "contract_version": "product-events.v3",
+  "contract_version": "product-events.v4",
   "envelope": {
     "properties": {
       "producer": {
@@ -162,6 +162,21 @@
         "cli_command": {
           "type": "enum",
           "values": [
+            "embeddings.sources",
+            "embeddings.models",
+            "embeddings.usage",
+            "embeddings.list",
+            "embeddings.get",
+            "embeddings.preview",
+            "embeddings.create",
+            "embeddings.update",
+            "embeddings.remove",
+            "embeddings.run",
+            "embeddings.pause",
+            "embeddings.resume",
+            "embeddings.retry",
+            "embeddings.reconcile",
+            "embeddings.context",
             "login",
             "logout",
             "whoami",
@@ -289,7 +304,7 @@
         "project_id": { "type": "identifier" },
         "connection_method": {
           "type": "enum",
-          "values": ["cli", "api", "database", "examples"]
+          "values": ["cli", "api", "database", "examples", "mcp"]
         }
       }
     },
@@ -581,6 +596,7 @@
             "insert",
             "update",
             "delete",
+            "merge",
             "create",
             "alter",
             "drop",
@@ -590,10 +606,21 @@
             "copy",
             "call",
             "do",
-            "begin",
-            "commit",
-            "rollback",
-            "unknown"
+            "grant",
+            "revoke",
+            "comment",
+            "analyze",
+            "vacuum",
+            "reindex",
+            "cluster",
+            "refresh",
+            "checkpoint",
+            "lock",
+            "import",
+            "load",
+            "reassign",
+            "security",
+            "values"
           ]
         },
         "duration_bucket": {

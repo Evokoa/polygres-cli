@@ -559,6 +559,49 @@ def test_projects_list_uses_env_token_and_selected_project_json(
 
 
 @ROUTE_CTX
+def test_projects_create_renders_free_nano_limit_message(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _stub(
+        respx.post(f"{API_BASE_URL}/projects"),
+        return_value=httpx.Response(
+            409,
+            json={
+                "request_id": "req_limit",
+                "error": {
+                    "code": "TIER_PROJECT_LIMIT_EXCEEDED",
+                    "message": "ignored server message",
+                    "details": {},
+                },
+            },
+        ),
+    )
+
+    rc, out, err = run_cli(
+        ["--json", "projects", "create", "standard", "Support"],
+        capsys,
+        monkeypatch,
+        tmp_path,
+    )
+
+    assert rc == 6
+    assert err == ""
+    assert json.loads(out) == {
+        "error": {
+            "code": "TIER_PROJECT_LIMIT_EXCEEDED",
+            "message": (
+                "Each organization can have one Free Nano project. To continue, create a Basic "
+                "project, or delete or upgrade the existing Nano project."
+            ),
+            "details": {},
+        },
+        "request_id": "req_limit",
+    }
+
+
+@ROUTE_CTX
 def test_projects_create_reports_created_project_when_status_poll_unavailable(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,

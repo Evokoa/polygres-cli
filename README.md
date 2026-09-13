@@ -169,7 +169,7 @@ Service and release notices are written to standard error, so standard output an
 
 ## Version and support
 
-Package version: [`0.4.1`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.4.1).
+Package version: [`0.5.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.5.0).
 
 Useful commands:
 
@@ -188,4 +188,44 @@ Users of the former combined `polygres` package should install both packages sep
 
 ## Changelog
 
-See the [CLI 0.4.1 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.4.1) for release changes.
+See the [CLI 0.5.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.5.0) for release changes.
+
+## Managed automatic embeddings
+
+CLI 0.5.0 adds managed generation for watched text columns and text queries using
+the configuration's pinned model. Managed output is stored separately from source
+columns. Upgrade an existing standalone CLI installation with:
+
+```bash
+pipx install "polygres-cli==0.5.0" --force
+polygres --version
+polygres --project PROJECT embeddings --help
+polygres --project PROJECT embeddings sources
+polygres --project PROJECT embeddings models
+polygres --project PROJECT embeddings usage
+```
+
+Use `preview --file configuration.json` before `create --file configuration.json`.
+Both accept `--file -` for standard input. Inspect progress with `list` and `get ID`;
+use `run`, `pause`, `resume`, `retry`, or `reconcile` with the configuration ID to
+control processing. `context ID` returns the managed source for separate Context
+collection setup. Query the collection with existing Context commands:
+
+```bash
+polygres context search articles --text "How does replication work?" --vector-name content
+polygres context search articles --embedding-file query-vector.json
+```
+
+Supply `--idempotency-key KEY` to creation and search when a request may need to
+resume after an interrupted response. `update ID --file changes.json` requires
+`expected_version` in the JSON body. `remove ID --expected-version VERSION`
+requires exactly one of `--keep-output` or `--delete-output`. Context text queries
+preserve existing filters and ranking options. Use `--text-file PATH` (or `-` for
+stdin), opt into authorized credits with `--use-credits`, and set a request
+deadline with `--timeout SECONDS`. `text-hybrid` can generate an embedding from
+its existing `--query` argument. Explicit-vector calls remain supported.
+
+Existing commands and saved login credentials remain supported. Availability
+requires embedding services, an enabled model catalog, and a quota policy in the
+connected environment. See the [automatic embeddings guide](https://docs.polygres.com/platform/automatic-embeddings)
+for configuration fields, quotas, and recovery.

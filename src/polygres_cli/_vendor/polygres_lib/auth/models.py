@@ -33,6 +33,7 @@ from .enums import (
     InvitationBlockedReason,
     InvitationKind,
     LifecycleState,
+    OrganizationBillingStatus,
     OrganizationInvitationDeliveryStatus,
     OrganizationInvitationRole,
     OrganizationInvitationState,
@@ -171,7 +172,7 @@ class OrganizationProjection(StrictContractModel):
     id: UUID
     name: OrganizationName
     slug: OrganizationSlug
-    billing_status: BillingStatus
+    billing_status: OrganizationBillingStatus
     assigned_tier_id: str | None
     created_by: UUID
 

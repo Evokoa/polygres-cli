@@ -4,6 +4,44 @@ All notable changes to `polygres-cli` are documented in this file.
 
 ## Unreleased
 
+## 0.5.0 - 2026-09-12
+
+### Added
+
+- Added `polygres embeddings` commands to discover eligible sources, list models
+  and usage, preview generation, and create, inspect, update, or remove managed
+  embedding configurations.
+- Added `run`, `pause`, `resume`, `retry`, and `reconcile` processing controls,
+  and `context` handoff for search collection setup.
+- Configuration files accept JSON from a file or standard input. Creation
+  accepts caller-owned idempotency keys; removal requires an expected
+  version and an explicit choice to keep or delete managed output.
+
+- Existing Context search, grouped search, and graph-hybrid commands accept
+  `--text` or `--text-file` as alternatives to explicit vectors. `text-hybrid`
+  can generate its query embedding from `--query`.
+- Select named vectors with `--vector-name`. Text queries support opt-in
+  `--use-credits`, stable `--idempotency-key` retries, and `--timeout`.
+
+### Changed
+
+- Embedding commands use scoped Runtime access and a 130-second request timeout.
+- Refreshed the bundled API specification and shared contracts for embedding
+  models, quotas, generation progress, and provider errors. Context responses
+  include HNSW storage limits and structured collection failures when available.
+
+### Compatibility
+
+- Existing vector input flags and result formats remain supported. Text input
+  requires an updated Runtime; CLI 0.4.1 cannot submit text-only queries through
+  its bundled API request schema.
+
+- Existing command syntax and saved login credentials remain supported. Upgrade
+  to 0.5.0 to use `embeddings` or discover its routes through `api request`.
+- Managed generation requires embedding services, an enabled model catalog, and
+  a quota policy in the connected environment. It must be configured explicitly
+  for a source table and stores output separately from source columns.
+
 ## 0.4.1 - 2026-08-25
 
 ### Changed

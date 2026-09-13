@@ -142,6 +142,14 @@ class BillingStatus(str, Enum):
     BETA = "beta"
 
 
+class OrganizationBillingStatus(str, Enum):
+    FREE = "free"
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
+    CANCELING = "canceling"
+    CANCELED = "canceled"
+
+
 class AdminInvitationBillingStatus(str, Enum):
     ACTIVE = "active"
     BETA = "beta"
@@ -240,7 +248,77 @@ class RuntimeScope(str, Enum):
 class RuntimeClientKind(str, Enum):
     DASHBOARD = "dashboard"
     CLI = "cli"
+    MCP = "mcp"
     GATEWAY_SYSTEM = "gateway_system"
+
+
+class McpProjectTargetingMode(str, Enum):
+    FIXED_PROJECT = "fixed_project"
+    MULTI_PROJECT = "multi_project"
+
+
+class McpInstallationStatus(str, Enum):
+    ACTIVE = "active"
+    REVOKED = "revoked"
+
+
+class McpFeatureGroup(str, Enum):
+    PROJECTS = "projects"
+    DATABASE = "database"
+    IMPORTS = "imports"
+    SYNC = "sync"
+    CONTEXT = "context"
+    GRAPH = "graph"
+    DEBUGGING = "debugging"
+    DOCS = "docs"
+
+
+class McpInstallationScope(str, Enum):
+    PROJECTS_READ = "mcp:projects:read"
+    PROJECTS_CREATE = "mcp:projects:create"
+    PROJECTS_MANAGE = "mcp:projects:manage"
+    CAPACITY_READ = "mcp:capacity:read"
+    CAPACITY_MANAGE = "mcp:capacity:manage"
+    ROWS_READ = "mcp:rows:read"
+    ROWS_WRITE = "mcp:rows:write"
+    IMPORTS_READ = "mcp:imports:read"
+    IMPORTS_MANAGE = "mcp:imports:manage"
+    CONTEXT_READ = "mcp:context:read"
+    CONTEXT_MANAGE = "mcp:context:manage"
+    GRAPH_READ = "mcp:graph:read"
+    GRAPH_MANAGE = "mcp:graph:manage"
+    SYNC_READ = "mcp:sync:read"
+    SYNC_MANAGE = "mcp:sync:manage"
+
+
+class McpToolEffect(str, Enum):
+    READ = "read"
+    VALIDATION = "validation"
+    WRITE = "write"
+    DESTRUCTIVE = "destructive"
+    RESOURCE_INTENSIVE_WRITE = "resource_intensive_write"
+    EXTERNAL_FINANCIAL_EFFECT = "external_financial_effect"
+
+
+class McpConfirmationClass(str, Enum):
+    NONE = "none"
+    WRITE = "write"
+    DESTRUCTIVE = "destructive"
+    RESOURCE_INTENSIVE = "resource_intensive"
+    EXTERNAL_FINANCIAL = "external_financial"
+
+
+class McpAccessDenialReason(str, Enum):
+    ALLOWED = "allowed"
+    INSTALLATION_REVOKED = "installation_revoked"
+    TARGETING_MODE_DENIED = "targeting_mode_denied"
+    FEATURE_DENIED = "feature_denied"
+    READ_ONLY_DENIED = "read_only_denied"
+    SCOPE_DENIED = "scope_denied"
+    ROLE_PERMISSION_DENIED = "role_permission_denied"
+    PROJECT_MODE_DENIED = "project_mode_denied"
+    PROJECT_STATE_DENIED = "project_state_denied"
+    COMPONENT_VERSION_DENIED = "component_version_denied"
 
 
 class ProjectType(str, Enum):

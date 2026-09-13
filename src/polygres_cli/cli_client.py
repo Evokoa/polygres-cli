@@ -944,29 +944,132 @@ class CliControlPlaneClient:
     def context_facets(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/facets"), payload, retry=True)
 
-    def context_search(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._post(self._context_path(project_id, "/search"), payload)
+    def _context_query(
+        self,
+        project_id: str,
+        suffix: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        from polygres_cli.context_inputs import context_idempotency_key
 
-    def context_grouped_search(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._post(self._context_path(project_id, "/grouped-search"), payload)
+        text_input = payload.get("text") is not None or (
+            suffix == "/hybrid/text"
+            and payload.get("embedding") is None
+            and isinstance(payload.get("query"), str)
+        )
+        if text_input:
+            idempotency_key = context_idempotency_key(idempotency_key)
+            timeout = 130.0 if timeout is None else timeout
+        return self._post(
+            self._context_path(project_id, suffix),
+            payload,
+            retry=text_input,
+            idempotency_key=idempotency_key,
+            timeout=timeout,
+            deadline=time.monotonic() + timeout if timeout is not None else None,
+        )
+
+    def context_search(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        return self._context_query(
+            project_id, "/search", payload, timeout=timeout, idempotency_key=idempotency_key
+        )
+
+    def context_grouped_search(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        return self._context_query(
+            project_id, "/grouped-search", payload, timeout=timeout, idempotency_key=idempotency_key
+        )
+
+    def context_text_hybrid(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        return self._context_query(
+            project_id, "/hybrid/text", payload, timeout=timeout, idempotency_key=idempotency_key
+        )
+
+    def context_graph_first(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        return self._context_query(
+            project_id,
+            "/hybrid/graph-first",
+            payload,
+            timeout=timeout,
+            idempotency_key=idempotency_key,
+        )
+
+    def context_vector_first(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        return self._context_query(
+            project_id,
+            "/hybrid/vector-first",
+            payload,
+            timeout=timeout,
+            idempotency_key=idempotency_key,
+        )
+
+    def context_rank_fusion(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        return self._context_query(
+            project_id,
+            "/hybrid/rank-fusion",
+            payload,
+            timeout=timeout,
+            idempotency_key=idempotency_key,
+        )
+
+    def context_joint(
+        self,
+        project_id: str,
+        payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        return self._context_query(
+            project_id, "/hybrid/joint", payload, timeout=timeout, idempotency_key=idempotency_key
+        )
 
     def context_recall_check(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._post(self._context_path(project_id, "/recall-check"), payload)
-
-    def context_text_hybrid(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._post(self._context_path(project_id, "/hybrid/text"), payload)
-
-    def context_graph_first(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._post(self._context_path(project_id, "/hybrid/graph-first"), payload)
-
-    def context_vector_first(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._post(self._context_path(project_id, "/hybrid/vector-first"), payload)
-
-    def context_rank_fusion(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._post(self._context_path(project_id, "/hybrid/rank-fusion"), payload)
-
-    def context_joint(self, project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._post(self._context_path(project_id, "/hybrid/joint"), payload)
 
     @staticmethod
     def _context_path(project_id: str, suffix: str) -> str:

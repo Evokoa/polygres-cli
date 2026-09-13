@@ -17,6 +17,7 @@
     "grouped_search": false,
     "grouped_search_blocker": "runtime_schema_not_ready",
     "grouped_search_blocker_message": "The project's Context runtime schema is not ready.",
+    "hnsw_record_limits": null,
     "joint": false,
     "joint_blocker": "runtime_schema_not_ready",
     "joint_blocker_message": "The project's Context runtime schema is not ready.",
@@ -50,6 +51,7 @@
     "point_scroll_blocker": "runtime_schema_not_ready",
     "point_scroll_blocker_message": "The project's Context runtime schema is not ready.",
     "product_status": "preview",
+    "query_embedding_generation": false,
     "rank_fusion": false,
     "rank_fusion_blocker": "runtime_schema_not_ready",
     "rank_fusion_blocker_message": "The project's Context runtime schema is not ready.",
@@ -693,7 +695,9 @@
           "table": "pgcontext_fixture_documents"
         }
       ],
+      "text": null,
       "traversal_limit": 500,
+      "use_credits": false,
       "vector_name": null,
       "weights": {
         "graph": 0.4,
@@ -918,6 +922,8 @@
       ],
       "filter": null,
       "limit": 10,
+      "text": null,
+      "use_credits": false,
       "vector_name": null
     },
     "ClearPayloadRequest": {
@@ -1058,6 +1064,8 @@
       ],
       "filter": null,
       "limit": 10,
+      "text": null,
+      "use_credits": false,
       "vector_name": null
     },
     "DiscoveryRequest": {
@@ -1101,6 +1109,8 @@
         "schema": "public",
         "table": "pgcontext_fixture_documents"
       },
+      "text": null,
+      "use_credits": false,
       "vector_name": null
     },
     "GraphStart": {
@@ -1118,6 +1128,8 @@
       "group_by": "tenant_id",
       "group_limit": 1,
       "limit": 10,
+      "text": null,
+      "use_credits": false,
       "vector_name": null
     },
     "JointSearchRequest": {
@@ -1145,7 +1157,9 @@
           "table": "pgcontext_fixture_documents"
         }
       ],
+      "text": null,
       "traversal_limit": 500,
+      "use_credits": false,
       "vector_name": null,
       "weights": {
         "graph": 0.4,
@@ -1180,7 +1194,8 @@
           0.2,
           0.3
         ]
-      }
+      },
+      "use_credits": false
     },
     "QueryExplainRequest": {
       "collection": "pgcontext_fixture",
@@ -1205,6 +1220,8 @@
         "schema": "public",
         "table": "pgcontext_fixture_documents"
       },
+      "text": null,
+      "use_credits": false,
       "vector_name": null,
       "weights": {
         "context": 0.7,
@@ -1283,6 +1300,8 @@
       ],
       "limit": 10,
       "query": "synthetic context",
+      "text": null,
+      "use_credits": false,
       "vector_name": null
     },
     "UpdateEmbeddingMigrationRequest": {
@@ -1310,6 +1329,8 @@
       "limit": 10,
       "max_depth": 2,
       "relationship_types": [],
+      "text": null,
+      "use_credits": false,
       "vector_name": null
     }
   },
@@ -1331,6 +1352,7 @@
       "grouped_search": false,
       "grouped_search_blocker": "runtime_schema_not_ready",
       "grouped_search_blocker_message": "The project's Context runtime schema is not ready.",
+      "hnsw_record_limits": null,
       "joint": false,
       "joint_blocker": "runtime_schema_not_ready",
       "joint_blocker_message": "The project's Context runtime schema is not ready.",
@@ -1364,6 +1386,7 @@
       "point_scroll_blocker": "runtime_schema_not_ready",
       "point_scroll_blocker_message": "The project's Context runtime schema is not ready.",
       "product_status": "preview",
+      "query_embedding_generation": false,
       "rank_fusion": false,
       "rank_fusion_blocker": "runtime_schema_not_ready",
       "rank_fusion_blocker_message": "The project's Context runtime schema is not ready.",
@@ -1417,6 +1440,7 @@
         "id": "00000000-0000-0000-0000-000000000001",
         "is_default": false,
         "jsonb_filter_paths": [],
+        "last_error": null,
         "last_error_code": "synthetic",
         "last_error_stage": "synthetic",
         "last_reconciled_at": "2026-07-29T00:00:00Z",
@@ -1515,6 +1539,7 @@
       "id": "00000000-0000-0000-0000-000000000001",
       "is_default": false,
       "jsonb_filter_paths": [],
+      "last_error": null,
       "last_error_code": "synthetic",
       "last_error_stage": "synthetic",
       "last_reconciled_at": "2026-07-29T00:00:00Z",

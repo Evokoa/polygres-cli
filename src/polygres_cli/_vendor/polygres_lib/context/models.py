@@ -82,12 +82,22 @@ class DiscoveryRequest(ContextRequest):
 
 
 class ContextSourceRequest(ContextRequest):
-    mode: ContextSourceMode
+    # JSON transports necessarily provide enum values as strings. Keep strict
+    # validation for the rest of the request while allowing Pydantic's strict
+    # call mode (used by MCP tool dispatch) to construct this enum.
+    mode: ContextSourceMode = Field(strict=False)
     schema_name: str
     table_name: str
     source_key_column: Literal["id"] = "id"
     content_column: str | None = None
     metadata_column: str | None = None
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _json_mode(cls, value: ContextSourceMode | str) -> ContextSourceMode:
+        if isinstance(value, ContextSourceMode):
+            return value
+        return ContextSourceMode(value)
 
     @field_validator("schema_name", "table_name", "content_column", "metadata_column")
     @classmethod
@@ -111,6 +121,13 @@ class ContextVectorRequest(ContextRequest):
     dimensions: int = Field(ge=1, le=16_000)
     metric: ContextMetric = ContextMetric.COSINE
 
+    @field_validator("metric", mode="before")
+    @classmethod
+    def _json_metric(cls, value: ContextMetric | str) -> ContextMetric:
+        if isinstance(value, ContextMetric):
+            return value
+        return ContextMetric(value)
+
     @field_validator("name", "column_name")
     @classmethod
     def _column(cls, value: str | None, info) -> str | None:
@@ -123,6 +140,13 @@ class ContextVectorCreateRequest(ContextVectorRequest):
     mode: Literal["existing", "add_column"] = "existing"
     index_kind: ContextIndexKind = ContextIndexKind.HNSW
     set_default: bool = False
+
+    @field_validator("index_kind", mode="before")
+    @classmethod
+    def _json_index_kind(cls, value: ContextIndexKind | str) -> ContextIndexKind:
+        if isinstance(value, ContextIndexKind):
+            return value
+        return ContextIndexKind(value)
 
 
 class JsonbFilterPathRequest(ContextRequest):
@@ -157,6 +181,13 @@ class CollectionCreateRequest(ContextRequest):
     jsonb_filter_paths: list[JsonbFilterPathRequest] = Field(default_factory=list, max_length=32)
     index_kind: ContextIndexKind = ContextIndexKind.HNSW
     max_search_limit: int = Field(default=1_000, ge=1, le=1_000)
+
+    @field_validator("index_kind", mode="before")
+    @classmethod
+    def _json_index_kind(cls, value: ContextIndexKind | str) -> ContextIndexKind:
+        if isinstance(value, ContextIndexKind):
+            return value
+        return ContextIndexKind(value)
 
     @field_validator("name", "text_column")
     @classmethod
@@ -432,15 +463,36 @@ class FacetsRequest(CountRequest):
         return value
 
 
-class DenseSearchRequest(CountRequest):
+class QueryEmbeddingInput(ContextRequest):
+    embedding: list[float] | None = None
+    text: str | None = Field(default=None, min_length=1, max_length=131072)
+    use_credits: bool = False
+
+    @field_validator("text")
+    @classmethod
+    def _text_input(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("text must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def _query_input(self):
+        if (self.embedding is None) == (self.text is None):
+            raise ValueError("supply exactly one of embedding or text")
+        if self.embedding is not None and self.use_credits:
+            raise ValueError("use_credits requires text input")
+        return self
+
+
+class DenseSearchRequest(QueryEmbeddingInput, CountRequest):
     vector_name: str | None = None
-    embedding: list[float]
     limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
 
     @field_validator("embedding", mode="before")
     @classmethod
     def _embedding(cls, value: list[float]) -> list[float]:
-        require_valid(validate_embedding(value))
+        if value is not None:
+            require_valid(validate_embedding(value))
         return value
 
     @field_validator("vector_name")
@@ -462,10 +514,9 @@ class CandidateSearchRequest(DenseSearchRequest):
         return value
 
 
-class GroupedSearchRequest(ContextRequest):
+class GroupedSearchRequest(QueryEmbeddingInput):
     collection: str
     vector_name: str | None = None
-    embedding: list[float]
     group_by: str
     group_limit: int = Field(default=1, ge=1, le=MAX_RANKED_LIMIT)
     limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
@@ -473,7 +524,8 @@ class GroupedSearchRequest(ContextRequest):
     @field_validator("embedding", mode="before")
     @classmethod
     def _embedding(cls, value: list[float]) -> list[float]:
-        require_valid(validate_embedding(value))
+        if value is not None:
+            require_valid(validate_embedding(value))
         return value
 
     @field_validator("group_by")
@@ -490,7 +542,24 @@ class GroupedSearchRequest(ContextRequest):
         return value
 
 
-class RecallCheckRequest(DenseSearchRequest):
+class RecallCheckRequest(CountRequest):
+    vector_name: str | None = None
+    embedding: list[float]
+    limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
+
+    @field_validator("embedding", mode="before")
+    @classmethod
+    def _embedding(cls, value: list[float]) -> list[float]:
+        require_valid(validate_embedding(value))
+        return value
+
+    @field_validator("vector_name")
+    @classmethod
+    def _vector_name(cls, value: str | None) -> str | None:
+        if value is not None:
+            require_valid(validate_identifier(value, field="vector_name"))
+        return value
+
     minimum_recall: float = 0.95
 
     @field_validator("minimum_recall")
@@ -500,17 +569,24 @@ class RecallCheckRequest(DenseSearchRequest):
         return value
 
 
-class TextHybridSearchRequest(ContextRequest):
+class TextHybridSearchRequest(QueryEmbeddingInput):
+    @model_validator(mode="before")
+    @classmethod
+    def _query_as_text(cls, value):
+        if isinstance(value, dict) and value.get("embedding") is None and value.get("text") is None:
+            return {**value, "text": value.get("query")}
+        return value
+
     collection: str
     vector_name: str | None = None
-    embedding: list[float]
     query: str = Field(min_length=1)
     limit: int = Field(default=10, ge=1, le=MAX_RANKED_LIMIT)
 
     @field_validator("embedding", mode="before")
     @classmethod
     def _embedding(cls, value: list[float]) -> list[float]:
-        require_valid(validate_embedding(value))
+        if value is not None:
+            require_valid(validate_embedding(value))
         return value
 
     @field_validator("vector_name")
@@ -546,6 +622,13 @@ class GraphSearchBase(DenseSearchRequest):
     graph_limit: int = Field(default=200, ge=1, le=MAX_RANKED_LIMIT)
     relationship_types: list[str] = Field(default_factory=list, max_length=32)
     direction: ContextGraphDirection = ContextGraphDirection.ANY
+
+    @field_validator("direction", mode="before")
+    @classmethod
+    def _json_direction(cls, value: ContextGraphDirection | str) -> ContextGraphDirection:
+        if isinstance(value, ContextGraphDirection):
+            return value
+        return ContextGraphDirection(value)
 
     @field_validator("relationship_types")
     @classmethod
@@ -608,7 +691,6 @@ class JointWeights(ContextRequest):
 
 
 class JointSearchRequest(GraphSearchBase):
-    embedding: list[float]
     query: str | None = None
     starts: list[GraphStart] = Field(default_factory=list, max_length=MAX_JOINT_SEEDS)
     context_limit: int = Field(default=50, ge=1, le=MAX_RANKED_LIMIT)
@@ -619,7 +701,8 @@ class JointSearchRequest(GraphSearchBase):
     @field_validator("embedding", mode="before")
     @classmethod
     def _raw_embedding(cls, value: Any) -> Any:
-        require_valid(validate_embedding(value))
+        if value is not None:
+            require_valid(validate_embedding(value))
         return value
 
     @field_validator(
@@ -684,6 +767,7 @@ class ContextQueryPlan(ContextRequest):
         "rerank",
     ]
     vector: list[float] | str | None = None
+    text: str | None = Field(default=None, min_length=1, max_length=131072)
     vector_name: str | None = None
     filter: dict[str, Any] | None = None
     text_query: str | None = None
@@ -729,7 +813,7 @@ class ContextQueryPlan(ContextRequest):
     @model_validator(mode="after")
     def _query_shape(self) -> ContextQueryPlan:
         required = {
-            "nearest": {"vector", "limit"},
+            "nearest": {"limit"},
             "sparse_nearest": {"vector_name", "vector", "limit"},
             "full_text": {"text_query", "text_column", "limit"},
             "late_interaction": {"query_vectors", "candidates_per_query", "limit"},
@@ -743,7 +827,7 @@ class ContextQueryPlan(ContextRequest):
             "rerank": {"branch", "limit"},
         }[self.kind]
         allowed = required | {
-            "nearest": {"vector_name", "filter"},
+            "nearest": {"vector", "text", "vector_name", "filter"},
             "sparse_nearest": {"filter"},
             "score_threshold": {"min_score", "max_score"},
         }.get(self.kind, set())
@@ -755,9 +839,15 @@ class ContextQueryPlan(ContextRequest):
         if unexpected:
             raise ValueError(f"{self.kind} query plan does not accept {sorted(unexpected)}")
         if self.kind == "nearest":
-            if not isinstance(self.vector, list):
-                raise ValueError("nearest vector must be a dense vector")
-            require_valid(validate_embedding(self.vector))
+            if (self.vector is None) == (self.text is None):
+                raise ValueError("nearest requires exactly one of vector or text")
+            if self.text is not None:
+                if not self.text.strip():
+                    raise ValueError("text must not be blank")
+            else:
+                if not isinstance(self.vector, list):
+                    raise ValueError("nearest vector must be a dense vector")
+                require_valid(validate_embedding(self.vector))
         elif self.kind == "sparse_nearest":
             if not isinstance(self.vector, str) or not self.vector.strip():
                 raise ValueError("sparse_nearest vector must be a sparse vector string")
@@ -790,6 +880,7 @@ class ContextQueryPlan(ContextRequest):
 
 
 class QueryExecuteRequest(ContextRequest):
+    use_credits: bool = False
     collection: str
     plan: ContextQueryPlan
 
@@ -854,7 +945,16 @@ class PgContextCompatibilityCapabilities(ContextResponse):
     missing_sdk: Literal[0]
 
 
+class HnswRecordLimits(ContextResponse):
+    pgcontext_version: str
+    max_record_bytes: int
+    dimension_bytes: int
+    base_overhead_bytes: int
+    hnsw_m: int
+
+
 class CapabilitiesResponse(ContextResponse):
+    hnsw_record_limits: HnswRecordLimits | None = None
     request_id: str
     contract_version: Literal["context.v1"]
     product_status: Literal["preview"]
@@ -864,6 +964,7 @@ class CapabilitiesResponse(ContextResponse):
     setup_blocker: str | None
     setup_blocker_message: str | None = None
     dense_search: bool
+    query_embedding_generation: bool = False
     dense_search_blocker: str | None
     dense_search_blocker_message: str | None = None
     point_scroll: bool
@@ -1051,6 +1152,7 @@ class ContextCollection(ContextResponse):
     point_reconciliation_status: ContextPointReconciliationStatus | str
     mapped_point_count: int | None
     last_reconciled_at: datetime | None
+    last_error: ErrorBody | None = None
     last_error_code: str | None
     last_error_stage: str | None
     created_at: datetime

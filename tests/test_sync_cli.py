@@ -8,7 +8,12 @@ import pytest
 import respx
 
 from polygres_cli import cli
-from polygres_cli.sync_inputs import sync_stage_idempotency_key
+from polygres_cli.cli_errors import CliError
+from polygres_cli.sync_inputs import (
+    automatic_sync_selection,
+    load_sync_selection,
+    sync_stage_idempotency_key,
+)
 
 API_BASE_URL = "https://api.example.test/v1"
 ACCESS_TOKEN = "pcli_at_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
@@ -81,10 +86,15 @@ def _table(
         "eligible": eligible,
         "estimated_rows": 12,
         "estimated_total_bytes": 4096,
-        "sync_key": None,
-        "sync_key_candidates": [
+        "replica_identity": "default",
+        "sync_key": {
+            "kind": "primary_key",
+            "index_name": f"{name}_external_id_key",
+            "columns": ["external_id"],
+        },
+        "destination_key_candidates": [
             {
-                "kind": "unique_index",
+                "kind": "primary_key",
                 "index_name": f"{name}_external_id_key",
                 "columns": ["external_id"],
             }
@@ -109,6 +119,31 @@ def test_sync_help_is_one_project_creation_command(
     assert "--all-eligible" in out
     assert "preflight" not in out.lower()
     assert "attempt" not in out.lower()
+
+
+def test_destination_selection_is_independent_of_source_key(tmp_path: Path) -> None:
+    table = _table()
+    email = {"kind": "unique_index", "index_name": "email_key", "columns": ["email"]}
+    external = table["destination_key_candidates"][0]
+    table.update(
+        replica_identity="index",
+        sync_key=email,
+        destination_key_candidates=[email, external],
+    )
+    with pytest.raises(CliError, match="destination_key_index_name"):
+        automatic_sync_selection(["public.orders"], [table])
+
+    table["destination_key"] = external
+    selection = automatic_sync_selection(["public.orders"], [table])
+    assert selection == [{
+        "schema_name": "public",
+        "table_name": "orders",
+        "destination_key_index_name": "orders_external_id_key",
+    }]
+    path = tmp_path / "selection.json"
+    path.write_text(json.dumps(selection))
+    assert load_sync_selection(path) == selection
+    assert table["sync_key"] == email
 
 
 def test_sync_create_requires_confirmation_before_connecting(
@@ -247,7 +282,7 @@ def test_sync_create_orchestrates_inspection_selection_and_project_creation(
             {
                 "schema_name": "public",
                 "table_name": "orders",
-                "sync_key_index_name": "orders_external_id_key",
+                "destination_key_index_name": "orders_external_id_key",
             }
         ],
     }

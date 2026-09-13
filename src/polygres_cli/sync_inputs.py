@@ -12,7 +12,13 @@ from polygres_cli.cli_errors import USAGE, CliError
 
 ENVIRONMENT_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SYNC_SELECTION_FIELDS = frozenset(
-    {"schema_name", "table_name", "sync_key_index_name", "included_columns"}
+    {
+        "schema_name",
+        "table_name",
+        "sync_key_index_name",
+        "destination_key_index_name",
+        "included_columns",
+    }
 )
 
 
@@ -118,9 +124,7 @@ def load_sync_selection(path: Path) -> list[dict[str, Any]]:
             raise _usage(f"Selection item {position} must be a JSON object.")
         unknown = sorted(set(item) - SYNC_SELECTION_FIELDS)
         if unknown:
-            raise _usage(
-                f"Selection item {position} has unsupported fields: {', '.join(unknown)}."
-            )
+            raise _usage(f"Selection item {position} has unsupported fields: {', '.join(unknown)}.")
         schema_name = _postgres_name(item.get("schema_name"), "schema_name", position)
         table_name = _postgres_name(item.get("table_name"), "table_name", position)
         identity = (schema_name, table_name)
@@ -131,11 +135,10 @@ def load_sync_selection(path: Path) -> list[dict[str, Any]]:
             "schema_name": schema_name,
             "table_name": table_name,
         }
-        index_name = item.get("sync_key_index_name")
-        if index_name is not None:
-            selection["sync_key_index_name"] = _postgres_name(
-                index_name, "sync_key_index_name", position
-            )
+        for key_field in ("sync_key_index_name", "destination_key_index_name"):
+            index_name = item.get(key_field)
+            if index_name is not None:
+                selection[key_field] = _postgres_name(index_name, key_field, position)
         included_columns = item.get("included_columns")
         if included_columns is not None:
             if not isinstance(included_columns, list) or not included_columns:
@@ -143,8 +146,7 @@ def load_sync_selection(path: Path) -> list[dict[str, Any]]:
                     f"Selection item {position} included_columns must be a non-empty array."
                 )
             columns = [
-                _postgres_name(column, "included_columns", position)
-                for column in included_columns
+                _postgres_name(column, "included_columns", position) for column in included_columns
             ]
             if len(set(columns)) != len(columns):
                 raise _usage(f"Selection item {position} has duplicate included_columns.")
@@ -170,9 +172,7 @@ def automatic_sync_selection(
         seen.add(identity)
         table = indexed.get(identity)
         if table is None:
-            raise _usage(
-                f"Table {schema_name}.{table_name} was not returned by source inspection."
-            )
+            raise _usage(f"Table {schema_name}.{table_name} was not returned by source inspection.")
         partial = table.get("partial_sync") if isinstance(table.get("partial_sync"), dict) else None
         if not table.get("eligible") and partial is None:
             code = table.get("ineligible_code") or "not eligible"
@@ -190,19 +190,35 @@ def automatic_sync_selection(
                 )
             selection["included_columns"] = included
 
-        candidates = _viable_candidates(table, selection.get("included_columns"))
         sync_key = table.get("sync_key") if isinstance(table.get("sync_key"), dict) else None
-        if len(candidates) == 1:
-            selection["sync_key_index_name"] = candidates[0]["index_name"]
-        elif sync_key is not None and sync_key.get("kind") == "unique_index":
-            selection["sync_key_index_name"] = sync_key.get("index_name")
-        elif sync_key is None and len(candidates) > 1:
-            raise _usage(
-                f"Table {schema_name}.{table_name} has multiple unique sync keys. "
-                "Use --file to select sync_key_index_name explicitly."
+        if (
+            sync_key is None
+            or (
+                table.get("replica_identity") == "default" and sync_key.get("kind") != "primary_key"
             )
-        elif sync_key is None:
-            raise _usage(f"Table {schema_name}.{table_name} has no usable sync key.")
+            or table.get("replica_identity") == "nothing"
+        ):
+            raise _usage(f"Table {schema_name}.{table_name} has no usable source change key.")
+        included = selection.get("included_columns")
+        if included is not None and not set(sync_key.get("columns", [])).issubset(included):
+            raise _usage(f"Table {schema_name}.{table_name} must include the source change key.")
+        candidates = [
+            candidate
+            for candidate in table.get("destination_key_candidates", [])
+            if isinstance(candidate, dict)
+            and (included is None or set(candidate.get("columns", [])).issubset(included))
+        ]
+        selected_key = table.get("destination_key")
+        if isinstance(selected_key, dict) and any(selected_key == key for key in candidates):
+            selection["destination_key_index_name"] = selected_key["index_name"]
+        elif len(candidates) == 1:
+            selection["destination_key_index_name"] = candidates[0]["index_name"]
+        elif len(candidates) > 1:
+            raise _usage(
+                f"Table {schema_name}.{table_name} has multiple eligible destination keys. "
+                "Use --file to set destination_key_index_name. "
+                "Source change tracking stays unchanged."
+            )
         selections.append(selection)
     return selections
 
@@ -232,22 +248,6 @@ def _postgres_name(value: object, field: str, position: int | None) -> str:
     if not isinstance(value, str) or not value or len(value) > 63:
         raise _usage(f"{field}{location} must be a non-empty string of at most 63 characters.")
     return value
-
-
-def _viable_candidates(
-    table: dict[str, Any], included_columns: list[str] | None
-) -> list[dict[str, Any]]:
-    values = table.get("sync_key_candidates")
-    candidates = [value for value in values or [] if isinstance(value, dict)]
-    if included_columns is None:
-        return candidates
-    included = set(included_columns)
-    return [
-        candidate
-        for candidate in candidates
-        if isinstance(candidate.get("columns"), list)
-        and all(column in included for column in candidate["columns"])
-    ]
 
 
 def _usage(message: str) -> CliError:

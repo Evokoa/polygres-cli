@@ -91,6 +91,10 @@ class DelegatedRuntimePrincipal:
     expires_at: datetime
     token_id: UUID
     key_id: str
+    organization_id: UUID | None = None
+    mcp_installation_id: UUID | None = None
+    mcp_request_id: str | None = None
+    read_only: bool = False
     credential_kind: Literal[CredentialKind.DELEGATED_RUNTIME_JWT] = (
         CredentialKind.DELEGATED_RUNTIME_JWT
     )
