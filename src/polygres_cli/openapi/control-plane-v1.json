@@ -12478,6 +12478,85 @@
         ]
       }
     },
+    "/v1/admin/embeddings/recovery/{project_id}": {
+      "get": {
+        "operationId": "admin_embedding_recovery_list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_resolved",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Resolved",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recovery List",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
     "/v1/admin/organizations/{organization_id}/billing": {
       "get": {
         "operationId": "admin_get_organization_billing_v1_admin_organizations__organization_id__billing_get",
@@ -21072,6 +21151,56 @@
             "ContextBearerAuth": []
           }
         ],
+        "summary": "Endpoint",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/embeddings/configurations/{configuration_id}/issues/rows": {
+      "get": {
+        "operationId": "embedding_issue_rows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "configuration_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Configuration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
         "summary": "Endpoint",
         "tags": [
           "embeddings"

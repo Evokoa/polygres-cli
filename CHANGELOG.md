@@ -4,6 +4,22 @@ All notable changes to `polygres-cli` are documented in this file.
 
 ## Unreleased
 
+## 0.6.0 - 2026-09-16
+
+### Added
+
+- Add oversized-failure recovery with preview, confirmation, internal version
+  handling, non-interactive approval, and protection against ambiguous replay.
+- Add opt-in progress summaries and bounded generation/search-publication watching.
+
+### Changed
+
+- Default new generation setups to automatic oversized-only chunking. Preserve
+  legacy payloads, saved settings, vector-copy defaults and existing command output.
+- Explain unsupported new features on older servers without silent fallback.
+- Document configuration-local parallel batches and recovery semantics.
+
+
 ## 0.5.0 - 2026-09-12
 
 ### Added

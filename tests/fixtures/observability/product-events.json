@@ -176,6 +176,7 @@
             "embeddings.resume",
             "embeddings.retry",
             "embeddings.reconcile",
+            "embeddings.recover-oversized",
             "embeddings.context",
             "login",
             "logout",

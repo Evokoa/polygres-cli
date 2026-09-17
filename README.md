@@ -169,7 +169,7 @@ Service and release notices are written to standard error, so standard output an
 
 ## Version and support
 
-Package version: [`0.5.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.5.0).
+Package version: [`0.6.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.6.0).
 
 Useful commands:
 
@@ -188,16 +188,16 @@ Users of the former combined `polygres` package should install both packages sep
 
 ## Changelog
 
-See the [CLI 0.5.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.5.0) for release changes.
+See the [CLI 0.6.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.6.0) for release changes.
 
 ## Managed automatic embeddings
 
-CLI 0.5.0 adds managed generation for watched text columns and text queries using
+CLI 0.6.0 supports managed generation for watched text columns and text queries using
 the configuration's pinned model. Managed output is stored separately from source
 columns. Upgrade an existing standalone CLI installation with:
 
 ```bash
-pipx install "polygres-cli==0.5.0" --force
+pipx install "polygres-cli==0.6.0" --force
 polygres --version
 polygres --project PROJECT embeddings --help
 polygres --project PROJECT embeddings sources
@@ -229,3 +229,57 @@ Existing commands and saved login credentials remain supported. Availability
 requires embedding services, an enabled model catalog, and a quota policy in the
 connected environment. See the [automatic embeddings guide](https://docs.polygres.com/platform/automatic-embeddings)
 for configuration fields, quotas, and recovery.
+
+## Automatic chunking and selective recovery (CLI 0.6.0)
+
+New generation configurations default to `"chunking": {"mode": "automatic"}`.
+Documents that fit the selected model remain whole. Oversized documents split at
+its token limit, allowing for model prefixes and overlap. Initial generation and
+later text/CDC changes use the same policy. `custom` and `off` remain available.
+Legacy `enabled`/size/overlap payloads and saved configurations retain their meaning.
+Existing-vector copying retains its unchunked default. Queries are not automatically
+chunked; shorten an oversized query.
+
+```bash
+polygres --project PROJECT embeddings recover-oversized CONFIGURATION --preview
+polygres --project PROJECT embeddings recover-oversized CONFIGURATION
+polygres --json --project PROJECT embeddings recover-oversized CONFIGURATION --yes
+polygres --project PROJECT embeddings get CONFIGURATION --summary
+polygres --project PROJECT embeddings list --summary
+polygres --json --project PROJECT embeddings get CONFIGURATION --watch --timeout 600
+```
+
+Recovery previews eligible and blocked failures, model limits and sample chunk
+counts. Confirmation enables automatic chunking for future source updates and
+requeues eligible failures. The command handles configuration versions internally.
+Successful documents and unknown provider outcomes stay untouched. A paused
+configuration stays paused. Rows are checked again on submission, so the final
+queued count can differ from the preview. Queued work is not completed generation.
+If there are no eligible rows, no settings change is submitted.
+
+Interactive recovery confirms the displayed changes. A configuration conflict
+refreshes the preview and asks again, at most three submissions. JSON and other
+non-interactive execution require `--yes` to mutate; `--preview` never mutates.
+Scripts exit on a version conflict. An ambiguous submission is never blindly
+repeated: inspect configuration progress and a fresh preview before deciding to retry.
+
+Existing commands retain their JSON output and syntax. `--summary` opts into a
+readable view on get/list/preview/create and processing actions; `--json` takes
+precedence. `get --watch` polls without mutation until generation and search
+publication finish. It stops on timeout, interruption, or generation requiring
+user action. It does not resume paused work. In JSON mode it prints one final
+configuration or a structured error, not a stream of concatenated JSON values.
+Missing progress fields are reported as unknown, not zero.
+
+Batches stay within one configuration, with up to four concurrent provider calls
+subject to shared worker limits. Pause stops new admission while started calls
+can finish. Retry preserves saved results and does not enable chunking. Reconcile
+does not authorize repeating unknown provider consumption. Search indexing and
+usage acknowledgements are separate from generation progress. Batch and worker
+settings are operator-managed and have no CLI tuning flags.
+
+An older server can still accept explicit off/custom chunking in legacy format.
+Automatic chunking and selective recovery require a compatible backend. Precise
+unsupported-field/action responses produce an upgrade message without silently
+disabling chunking or substituting an ordinary retry. Existing login/config files
+and JSON response fields remain compatible.

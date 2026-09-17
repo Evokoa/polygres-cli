@@ -8,7 +8,14 @@ from enum import Enum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 Identifier = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$", max_length=63)]
 
@@ -43,13 +50,23 @@ class ResponseModel(BaseModel):
 
 
 class Chunking(RequestModel):
+    mode: Literal["automatic", "custom", "off"] | None = None
     enabled: bool = False
     size_tokens: int = Field(default=512, ge=32, le=8192)
     overlap_tokens: int = Field(default=64, ge=0, le=2048)
 
+    @model_serializer(mode="wrap")
+    def legacy_serialization(self, handler):
+        result = handler(self)
+        if self.mode is None:
+            result.pop("mode", None)
+        return result
+
     @model_validator(mode="after")
     def valid_overlap(self) -> Chunking:
-        if self.overlap_tokens >= self.size_tokens:
+        if self.mode is not None:
+            self.enabled = self.mode != "off"
+        if self.mode != "automatic" and self.overlap_tokens >= self.size_tokens:
             raise ValueError("overlap_tokens must be smaller than size_tokens")
         return self
 
@@ -204,7 +221,18 @@ class EmbeddingConfigurationCreate(RequestModel):
     dimensions: int = Field(ge=1, le=4096)
     mode: ProcessingMode = ProcessingMode.AUTOMATIC
     use_credits: bool = False
-    chunking: Chunking = Field(default_factory=Chunking)
+    chunking: Chunking = Field(default_factory=lambda: Chunking(mode="automatic"))
+
+    @model_validator(mode="before")
+    @classmethod
+    def copy_default(cls, value):
+        if (
+            isinstance(value, dict)
+            and value.get("existing_vector_column")
+            and "chunking" not in value
+        ):
+            return value | {"chunking": {"enabled": False}}
+        return value
 
     @model_validator(mode="after")
     def valid_copy(self) -> EmbeddingConfigurationCreate:
@@ -222,6 +250,7 @@ class EmbeddingConfigurationCreate(RequestModel):
 class EmbeddingConfigurationSettings(EmbeddingConfigurationCreate):
     """Persisted settings, including operator-managed processing limits."""
 
+    chunking: Chunking = Field(default_factory=Chunking)
     batch_size: int = Field(default=100, ge=1, le=1000)
 
 
@@ -233,12 +262,63 @@ class EmbeddingConfigurationUpdate(RequestModel):
 
 
 class EmbeddingActionRequest(RequestModel):
-    action: Literal["pause", "resume", "run", "retry", "reconcile"]
+    action: Literal[
+        "pause", "resume", "run", "retry", "reconcile", "preview_chunking", "enable_chunking"
+    ]
+    expected_version: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def recovery_version(self):
+        if self.action == "enable_chunking" and self.expected_version is None:
+            raise ValueError("expected_version is required to enable automatic chunking")
+        return self
+
+
+class EmbeddingChunkingSample(ResponseModel):
+    work_id: UUID
+    source_key: dict[str, Any]
+    input_tokens: int
+    chunks: int
+
+
+class EmbeddingChunkingRecovery(ResponseModel):
+    expected_version: int
+    eligible_rows: int
+    blocked_rows: int
+    max_input_tokens: int
+    samples: list[EmbeddingChunkingSample]
+    retried_rows: int = 0
 
 
 class EmbeddingRemoveRequest(RequestModel):
     delete_managed_output: bool
     expected_version: int = Field(ge=1)
+
+
+class EmbeddingIssue(ResponseModel):
+    state: Literal["recovering", "action_required", "investigation"]
+    reason: Literal[
+        "service_delay",
+        "allowance",
+        "credits",
+        "spending_disabled",
+        "spending_limit",
+        "source_text_too_long",
+        "source_changed",
+    ]
+    rows: int = Field(ge=0)
+    action: Literal["billing", "spending_settings", "source_rows"] | None = None
+
+
+class EmbeddingIssueRow(ResponseModel):
+    work_id: UUID
+    source_key: dict[str, Any]
+    reason: Literal["source_text_too_long", "source_changed"]
+
+
+class EmbeddingIssueRows(ResponseModel):
+    rows: list[EmbeddingIssueRow]
+    next_cursor: UUID | None = None
 
 
 class EmbeddingProgress(ResponseModel):
@@ -261,6 +341,7 @@ class EmbeddingProgress(ResponseModel):
     next_retry_at: datetime | None = None
     failed: int = 0
     uncertain: int = 0
+    delayed: int = Field(default=0, description="Current source rows undergoing service recovery.")
     deleted: int = 0
     input_tokens: int = 0
     context_pending: int = 0
@@ -278,6 +359,7 @@ class EmbeddingConfiguration(ResponseModel):
     managed_table: str
     progress: EmbeddingProgress = Field(default_factory=EmbeddingProgress)
     last_error_code: str | None = None
+    issues: list[EmbeddingIssue] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     initial_scan_complete: bool = False
