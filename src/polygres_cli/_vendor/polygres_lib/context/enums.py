@@ -83,6 +83,10 @@ class ContextFilterKind(str, Enum):
 
 
 class ContextOperationKind(str, Enum):
+    TEXT_CREATE = "text_create"
+    TEXT_UPDATE = "text_update"
+    TEXT_DELETE = "text_delete"
+    TEXT_REINDEX = "text_reindex"
     COLLECTION_CREATE = "collection_create"
     COLLECTION_SET_DEFAULT = "collection_set_default"
     COLLECTION_UPDATE = "collection_update"
@@ -163,6 +167,24 @@ class ContextRecommendedAction(str, Enum):
 
 
 CONTEXT_OPERATION_STAGES: dict[ContextOperationKind, tuple[str, ...]] = {
+    **{
+        kind: (
+            "queued",
+            "preflight",
+            "configuring",
+            "building_index",
+            "verifying",
+            "ready",
+            "failed",
+            "cancelled",
+        )
+        for kind in (
+            ContextOperationKind.TEXT_CREATE,
+            ContextOperationKind.TEXT_UPDATE,
+            ContextOperationKind.TEXT_DELETE,
+            ContextOperationKind.TEXT_REINDEX,
+        )
+    },
     ContextOperationKind.COLLECTION_CREATE: (
         "queued",
         "preflight",

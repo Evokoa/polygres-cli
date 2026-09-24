@@ -196,6 +196,7 @@ class CliBrowserStateSigningConfig:
     key_id: str
     signing_key: SecretValue
     verification_keys: Mapping[str, SecretValue]
+    previous_audiences: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if (

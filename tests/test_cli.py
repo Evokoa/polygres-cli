@@ -2461,6 +2461,44 @@ def test_verbose_traces_are_redacted(
 
 
 @ROUTE_CTX
+@pytest.mark.parametrize("json_output", [False, True])
+def test_csv_import_displays_empty_file_error(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    json_output: bool,
+) -> None:
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    csv_path = tmp_path / "empty.csv"
+    csv_path.write_bytes(b"")
+    route = _stub(
+        respx.post(f"{API_BASE_URL}/projects/{PROJECT_ID}/imports/csv/upload-sessions"),
+        return_value=httpx.Response(
+            400,
+            json={
+                "request_id": "req_empty_csv",
+                "error": {
+                    "code": "IMPORT_CSV_EMPTY",
+                    "message": "CSV file is empty.",
+                    "details": {},
+                },
+            },
+        ),
+    )
+    args = (["--json"] if json_output else []) + [
+        "import", "csv", str(csv_path), "--table", "empty_csv"
+    ]
+
+    rc, out, err = run_cli(args, capsys, monkeypatch, tmp_path)
+
+    assert route.called
+    assert rc == 2
+    assert "CSV file is empty." in out + err
+    if json_output:
+        assert json.loads(out)["error"]["code"] == "IMPORT_CSV_EMPTY"
+
+
+@ROUTE_CTX
 def test_backend_error_mapping_to_json_exit_code(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -3739,3 +3777,142 @@ def test_cli_completion_delivery_failure_does_not_change_command_result(
     assert json.loads(out)["projects"] == []
     assert err == ""
     assert completion_route.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "state,label",
+    [
+        ("archiving", "Archiving"),
+        ("archived", "Archived"),
+        ("restoring", "Restoring"),
+        ("active", "ready"),
+    ],
+)
+@pytest.mark.parametrize("json_output", [False, True])
+@ROUTE_CTX
+def test_project_archive_status_is_visible(
+    state, label, json_output, capsys, monkeypatch, tmp_path
+):
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/status"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_archive",
+                "status": {
+                    "project": "ready",
+                    "archive_state": state,
+                    "archive_operation": None,
+                },
+            },
+        ),
+    )
+    rc, out, err = run_cli(
+        (["--json"] if json_output else []) + ["projects", "status"], capsys, monkeypatch, tmp_path
+    )
+    assert rc == 0
+    assert not err
+    if json_output:
+        project = json.loads(out)["project"]
+        assert project["status"] == "ready"
+        assert project["archive_state"] == state
+    else:
+        assert re.search(rf"Project status\s+{label}", out)
+        if state != "active":
+            assert re.search(r"Database access\s+Unavailable", out)
+            assert catalog_message("PROJECT_ARCHIVED", variant=state) in out
+            assert "ready" not in out
+
+
+@pytest.mark.parametrize("json_output", [False, True])
+@ROUTE_CTX
+def test_project_list_displays_archive_state(json_output, capsys, monkeypatch, tmp_path):
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "projects": [
+                    {
+                        "external_id": PROJECT_ID,
+                        "name": "Default Project",
+                        "status": "ready",
+                        "archive_state": "archived",
+                    }
+                ]
+            },
+        ),
+    )
+    rc, out, err = run_cli(
+        (["--json"] if json_output else []) + ["projects", "list"], capsys, monkeypatch, tmp_path
+    )
+    assert rc == 0
+    assert not err
+    if json_output:
+        assert json.loads(out)["projects"][0]["archive_state"] == "archived"
+    else:
+        assert "Archived" in out
+        assert "ready" not in out
+
+
+@ROUTE_CTX
+def test_project_status_shows_restore_failure(capsys, monkeypatch, tmp_path):
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/status"),
+        return_value=httpx.Response(
+            200,
+            json={
+                "request_id": "req_restore_failed",
+                "status": {
+                    "project": "ready",
+                    "archive_state": "restoring",
+                    "archive_operation": {
+                        "kind": "restore",
+                        "stage": "attention",
+                        "error_code": "PROJECT_RESTORE_FAILED",
+                    },
+                },
+            },
+        ),
+    )
+    rc, out, err = run_cli(["projects", "status"], capsys, monkeypatch, tmp_path)
+    assert rc == 0
+    assert not err
+    assert re.search(r"Project status\s+Restoring", out)
+    assert catalog_message("PROJECT_RESTORE_FAILED") in out
+    assert "req_restore_failed" in out
+
+
+@pytest.mark.parametrize("state", ["archiving", "archived", "restoring"])
+@pytest.mark.parametrize("json_output", [False, True])
+@ROUTE_CTX
+def test_archived_project_command_uses_exit_8(state, json_output, capsys, monkeypatch, tmp_path):
+    write_config(tmp_path, {"version": 1, "selected_project_id": PROJECT_ID})
+    route = _stub(
+        respx.get(f"{API_BASE_URL}/projects/{PROJECT_ID}/retrieval/readiness"),
+        return_value=httpx.Response(
+            409,
+            json={
+                "request_id": "req_archive",
+                "error": {
+                    "code": "PROJECT_ARCHIVED",
+                    "variant": state,
+                    "message": catalog_message("PROJECT_ARCHIVED", variant=state),
+                    "details": {"archive_state": state},
+                },
+            },
+        ),
+    )
+    rc, out, err = run_cli(
+        (["--json"] if json_output else []) + ["ready"], capsys, monkeypatch, tmp_path
+    )
+    assert rc == 8
+    assert route.call_count == 1
+    if json_output:
+        error = json.loads(out)["error"]
+        assert error["code"] == "PROJECT_ARCHIVED"
+        assert error["details"]["archive_state"] == state
+    else:
+        assert catalog_message("PROJECT_ARCHIVED", variant=state) in err

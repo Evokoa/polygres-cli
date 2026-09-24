@@ -37,6 +37,11 @@ from polygres_cli._vendor.polygres_lib.context import (
     TextHybridSearchRequest,
     VectorFirstSearchRequest,
 )
+from polygres_cli._vendor.polygres_lib.errors import catalog_message
+from polygres_cli._vendor.polygres_lib.project_archives import (
+    project_archive_blocks_access,
+    project_archive_error,
+)
 from polygres_cli._version import __version__
 from polygres_cli.api_openapi import (
     HTTP_METHODS,
@@ -1179,7 +1184,8 @@ def handle_projects_list(ctx: Context, args: argparse.Namespace) -> int:
             if _has_external_ids(projects)
             else ["id", "name", "status"]
         )
-        print_table(output["projects"], columns)
+        rows = [{**project, "status": _project_display_status(project)} for project in projects]
+        print_table(rows, columns)
     return SUCCESS
 
 
@@ -1242,17 +1248,30 @@ def handle_projects_status(ctx: Context, args: argparse.Namespace) -> int:
     project_id = _resolve_project_id(ctx, args.status_project)
     payload = ctx.client.get_project_status(project_id)
     output = _project_status_output(project_id, payload)
-    return _emit(
-        ctx,
-        output,
-        [
-            ("Project", project_id),
-            ("Project status", output["project"].get("status", "")),
+    project = output["project"]
+    state = project.get("archive_state")
+    items = [("Project", project_id), ("Project status", _project_display_status(project))]
+    if project_archive_blocks_access(state):
+        items.extend([
+            ("Database access", "Unavailable"),
+            ("Guidance", project_archive_error(state).message),
+        ])
+        operation = project.get("archive_operation") or {}
+        code = operation.get("error_code")
+        if code in {"PROJECT_ARCHIVE_FAILED", "PROJECT_RESTORE_FAILED",
+                    "PROJECT_ARCHIVE_INTERRUPTED"}:
+            items.extend([
+                ("Archive operation", catalog_message(code)),
+                ("Error code", code),
+                ("Request ID", output.get("request_id", "")),
+            ])
+    else:
+        items.extend([
             ("Runtime status", _summary_value(output["runtime"])),
             ("Resource pressure", _resource_pressure(output["resources"])),
             ("Readiness", _summary_value(output["readiness"])),
-        ],
-    )
+        ])
+    return _emit(ctx, output, items)
 
 
 def handle_sync_create(ctx: Context, args: argparse.Namespace) -> int:
@@ -3547,6 +3566,14 @@ def _emit_config_response(
     return _emit(ctx, output, [("Configuration", output["configuration"].get("id", ""))])
 
 
+def _project_display_status(project: dict[str, Any]) -> str:
+    state = project.get("archive_state")
+    if project_archive_blocks_access(state):
+        return {"archiving": "Archiving", "archived": "Archived",
+                "restoring": "Restoring"}.get(state, "Unavailable")
+    return str(project.get("status", ""))
+
+
 def _project_status_output(project_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     status = payload.get("status") if isinstance(payload.get("status"), dict) else {}
     project = payload.get("project") if isinstance(payload.get("project"), dict) else {}
@@ -3562,6 +3589,9 @@ def _project_status_output(project_id: str, payload: dict[str, Any]) -> dict[str
             }
             if "project_mode" in status:
                 project["project_mode"] = status["project_mode"]
+        for key in ("archive_state", "archived_at", "archive_operation"):
+            if key in status:
+                project[key] = status[key]
         if not runtime:
             runtime = {
                 key: status[key]

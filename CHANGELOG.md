@@ -4,6 +4,25 @@ All notable changes to `polygres-cli` are documented in this file.
 
 ## Unreleased
 
+## 0.7.0 - 2026-09-24
+
+### Compatibility
+
+- Archived-project failures now exit with code 8 instead of 6. Update scripts
+  that branch on exit code 6 for `PROJECT_ARCHIVED`. This public behavior change
+  is released as a minor version before 1.0. Status inspection still exits 0.
+- Shared-catalog refresh also changes embedding and export error exit codes.
+  See the [CLI 0.7.0 migration table](README.md#upgrading-to-cli-070).
+
+### Fixed
+
+- Show Archiving, Archived, and Restoring instead of the provisioning status in
+  project lists and status output. Preserve archive state and operation failures
+  in JSON status output and provide restoration guidance in human output.
+- Report blocked project access with the canonical archive message and exit code
+  8. These errors previously fell back to HTTP-conflict exit code 6.
+- Refresh bundled API routes, shared error definitions, and contract fixtures.
+
 ## 0.6.0 - 2026-09-16
 
 ### Added

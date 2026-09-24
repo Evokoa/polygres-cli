@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ..schema_eligibility import is_eligible_schema
 from .enums import (
     ContextCollectionStatus,
     ContextDiagnosticCheckStatus,
@@ -78,6 +79,8 @@ class DiscoveryRequest(ContextRequest):
             raise ValueError("schema_names must not be empty")
         for index, item in enumerate(value):
             require_valid(validate_identifier(item, field=f"schema_names.{index}"))
+            if not is_eligible_schema(item):
+                raise ValueError("schema_names contains a reserved schema")
         return deduplicate_first(value)
 
 
@@ -104,6 +107,8 @@ class ContextSourceRequest(ContextRequest):
     def _identifier(cls, value: str | None, info) -> str | None:
         if value is not None:
             require_valid(validate_identifier(value, field=info.field_name))
+            if info.field_name == "schema_name" and not is_eligible_schema(value):
+                raise ValueError("source schema is reserved")
         return value
 
     @model_validator(mode="after")

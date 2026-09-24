@@ -169,7 +169,7 @@ Service and release notices are written to standard error, so standard output an
 
 ## Version and support
 
-Package version: [`0.6.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.6.0).
+Package version: [`0.7.0`](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.7.0).
 
 Useful commands:
 
@@ -188,16 +188,16 @@ Users of the former combined `polygres` package should install both packages sep
 
 ## Changelog
 
-See the [CLI 0.6.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.6.0) for release changes.
+See the [CLI 0.7.0 release notes](https://github.com/Evokoa/polygres-cli/releases/tag/python-cli-v0.7.0) for release changes.
 
 ## Managed automatic embeddings
 
-CLI 0.6.0 supports managed generation for watched text columns and text queries using
+CLI 0.7.0 supports managed generation for watched text columns and text queries using
 the configuration's pinned model. Managed output is stored separately from source
 columns. Upgrade an existing standalone CLI installation with:
 
 ```bash
-pipx install "polygres-cli==0.6.0" --force
+pipx install "polygres-cli==0.7.0" --force
 polygres --version
 polygres --project PROJECT embeddings --help
 polygres --project PROJECT embeddings sources
@@ -230,7 +230,7 @@ requires embedding services, an enabled model catalog, and a quota policy in the
 connected environment. See the [automatic embeddings guide](https://docs.polygres.com/platform/automatic-embeddings)
 for configuration fields, quotas, and recovery.
 
-## Automatic chunking and selective recovery (CLI 0.6.0)
+## Automatic chunking and selective recovery (CLI 0.7.0)
 
 New generation configurations default to `"chunking": {"mode": "automatic"}`.
 Documents that fit the selected model remain whole. Oversized documents split at
@@ -283,3 +283,43 @@ Automatic chunking and selective recovery require a compatible backend. Precise
 unsupported-field/action responses produce an upgrade message without silently
 disabling chunking or substituting an ordinary retry. Existing login/config files
 and JSON response fields remain compatible.
+
+## Archived projects
+
+`polygres projects list` and `polygres projects status` display **Archiving**,
+**Archived**, or **Restoring** instead of the provisioning status while access
+is blocked. JSON output preserves the underlying provisioning `status` and the
+separate `archive_state`. Status output also includes the latest archive
+operation when available, including archive/restore failures and request IDs.
+
+Blocked database commands return `PROJECT_ARCHIVED`, HTTP 409, and exit code
+**8**. CLI 0.6.0 used fallback conflict exit code 6 for this error; scripts should
+accept the corrected code when upgrading. Messages explain whether the project
+is being archived, needs restoration in the dashboard, or is being restored.
+Commands do not automatically restore projects. Inspecting project status still
+exits successfully with code 0.
+
+## Upgrading to CLI 0.7.0
+
+Command syntax remains supported. Update scripts that branch on these error
+exit codes, corrected by the shared-catalog refresh:
+
+| Error code | CLI 0.6.0 | CLI 0.7.0 |
+| --- | --- | --- |
+| `EMBEDDING_CONNECTION_CONFLICT` | 2 | 4 |
+| `EMBEDDING_MODEL_PROBE_REQUIRED` | 2 | 4 |
+| `EMBEDDING_TOKENIZER_UNAVAILABLE` | 2 | 4 |
+| `PROJECT_ARCHIVED` | 6 | 8 |
+| `PROJECT_ARCHIVE_CONFLICT` | 6 | 8 |
+| `PROJECT_ARCHIVE_UNSUPPORTED` | 6 | 8 |
+| `PROJECT_EXPORT_EXPIRED` | 2 | 8 |
+| `PROJECT_EXPORT_NOT_FOUND` | 5 | 8 |
+| `PROJECT_EXPORT_NOT_READY` | 6 | 8 |
+| `PROJECT_EXPORT_NOT_SUPPORTED` | 6 | 8 |
+
+The updated Runtime backend returns authenticated archived-project failures as
+HTTP 409 `PROJECT_ARCHIVED` instead of HTTP 404 `RUNTIME_PROJECT_NOT_FOUND`.
+Even without upgrading the CLI, that Runtime response change moves the released
+CLI 0.6.0 fallback exit code from 5 to 6. Central API archive denials already
+use HTTP 409. Older CLI versions can still make existing requests, but do not
+provide the corrected archive status display.

@@ -138,6 +138,22 @@
         "title": "ApplicationPermissionCheck",
         "type": "object"
       },
+      "ArchiveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ArchiveRequest",
+        "type": "object"
+      },
       "BackfillPointsRequest": {
         "additionalProperties": false,
         "properties": {
@@ -872,6 +888,11 @@
               }
             ],
             "title": "Quote Id"
+          },
+          "relocation_confirmed": {
+            "default": false,
+            "title": "Relocation Confirmed",
+            "type": "boolean"
           }
         },
         "required": [
@@ -3059,6 +3080,10 @@
       },
       "ContextOperationKind": {
         "enum": [
+          "text_create",
+          "text_update",
+          "text_delete",
+          "text_reindex",
           "collection_create",
           "collection_set_default",
           "collection_update",
@@ -4670,6 +4695,72 @@
         "title": "EmailVerificationCompletionCommand",
         "type": "object"
       },
+      "EmbeddingConnectionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "auth_header": {
+            "default": "Authorization",
+            "enum": [
+              "Authorization",
+              "api-key"
+            ],
+            "title": "Auth Header",
+            "type": "string"
+          },
+          "auth_kind": {
+            "default": "key_vault",
+            "enum": [
+              "key_vault",
+              "azure_identity"
+            ],
+            "title": "Auth Kind",
+            "type": "string"
+          },
+          "auth_prefix": {
+            "default": "Bearer ",
+            "pattern": "^(Bearer |)$",
+            "title": "Auth Prefix",
+            "type": "string"
+          },
+          "credential_ref": {
+            "pattern": "^POLYGRES_EMBEDDING_[A-Z0-9_]+$",
+            "title": "Credential Ref",
+            "type": "string"
+          },
+          "endpoint": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Id",
+            "type": "string"
+          },
+          "secret_name": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9-]{1,127}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret Name"
+          }
+        },
+        "required": [
+          "id",
+          "credential_ref",
+          "endpoint"
+        ],
+        "title": "EmbeddingConnectionCreate",
+        "type": "object"
+      },
       "EmbeddingMigrationRow": {
         "additionalProperties": true,
         "properties": {
@@ -4744,6 +4835,23 @@
           "rows"
         ],
         "title": "EmbeddingMigrationsResponse",
+        "type": "object"
+      },
+      "EmbeddingRequestOptions": {
+        "additionalProperties": false,
+        "properties": {
+          "send_dimensions": {
+            "default": true,
+            "title": "Send Dimensions",
+            "type": "boolean"
+          },
+          "send_encoding_format": {
+            "default": true,
+            "title": "Send Encoding Format",
+            "type": "boolean"
+          }
+        },
+        "title": "EmbeddingRequestOptions",
         "type": "object"
       },
       "EmptyRequest": {
@@ -4841,6 +4949,112 @@
           "column"
         ],
         "title": "ExistingTextTsvectorSetupRequest",
+        "type": "object"
+      },
+      "ExportCreateRequest": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "ExportCreateRequest",
+        "type": "object"
+      },
+      "ExportJobResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "format": {
+            "const": "postgres_custom",
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "scope": {
+            "const": "user_database",
+            "title": "Scope",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "failed",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "format",
+          "status",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "ExportJobResponse",
+        "type": "object"
+      },
+      "ExportResponse": {
+        "properties": {
+          "export": {
+            "$ref": "#/components/schemas/ExportJobResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "export"
+        ],
+        "title": "ExportResponse",
         "type": "object"
       },
       "FacetValue": {
@@ -6879,10 +7093,8 @@
             "type": "string"
           },
           "provider": {
-            "enum": [
-              "openai",
-              "qwen"
-            ],
+            "maxLength": 100,
+            "minLength": 1,
             "title": "Provider",
             "type": "string"
           },
@@ -6890,6 +7102,16 @@
             "additionalProperties": true,
             "title": "Query Settings",
             "type": "object"
+          },
+          "request_options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmbeddingRequestOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "revision": {
             "maxLength": 120,
@@ -6907,6 +7129,21 @@
             "minLength": 1,
             "title": "Tokenizer",
             "type": "string"
+          },
+          "tokenizer_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tiktoken",
+                  "huggingface"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokenizer Kind"
           },
           "tokenizer_sha256": {
             "anyOf": [
@@ -7449,6 +7686,7 @@
           "project:read",
           "project:update",
           "project:delete",
+          "project:export",
           "project:sql:execute",
           "project:retry_provisioning",
           "imports:read",
@@ -9658,6 +9896,12 @@
           "to"
         ],
         "title": "Relationship",
+        "type": "object"
+      },
+      "RestoreRequest": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "RestoreRequest",
         "type": "object"
       },
       "RetrievalReadyCompletionRequest": {
@@ -12093,6 +12337,62 @@
         "summary": "Admin Reconcile Top Up Purchase"
       }
     },
+    "/v1/admin/embeddings/connections": {
+      "get": {
+        "operationId": "admin_embedding_connections",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Embedding Connections",
+        "tags": [
+          "embeddings-admin"
+        ]
+      },
+      "post": {
+        "operationId": "admin_embedding_create_connection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingConnectionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Embedding Create Connection",
+        "tags": [
+          "embeddings-admin"
+        ]
+      }
+    },
     "/v1/admin/embeddings/models": {
       "get": {
         "operationId": "admin_embedding_models",
@@ -12901,6 +13201,66 @@
           }
         },
         "summary": "Activate Project Capacity"
+      }
+    },
+    "/v1/admin/projects/{project_id}/archive": {
+      "post": {
+        "operationId": "archive_project_v1_admin_projects__project_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Project",
+        "tags": [
+          "project archives"
+        ]
       }
     },
     "/v1/admin/runtime-api-rollouts": {
@@ -15938,6 +16298,46 @@
           }
         },
         "summary": "Revoke Api Key"
+      }
+    },
+    "/v1/projects/{project_id}/archive": {
+      "get": {
+        "operationId": "project_archive_status_v1_projects__project_id__archive_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Archive Status",
+        "tags": [
+          "project archives"
+        ]
       }
     },
     "/v1/projects/{project_id}/basic-upgrades": {
@@ -21407,6 +21807,167 @@
         ]
       }
     },
+    "/v1/projects/{project_id}/exports/pg-dump": {
+      "post": {
+        "operationId": "create_export_v1_projects__project_id__exports_pg_dump_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ExportCreateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/exports/{export_id}": {
+      "get": {
+        "operationId": "get_export_v1_projects__project_id__exports__export_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/exports/{export_id}/download": {
+      "get": {
+        "operationId": "download_export_v1_projects__project_id__exports__export_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Export",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
     "/v1/projects/{project_id}/graph/build": {
       "post": {
         "operationId": "build_graph_v1_projects__project_id__graph_build_post",
@@ -22998,6 +23559,66 @@
           }
         },
         "summary": "Reconcile Project Runtime"
+      }
+    },
+    "/v1/projects/{project_id}/restore": {
+      "post": {
+        "operationId": "restore_project_v1_projects__project_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Project",
+        "tags": [
+          "project archives"
+        ]
       }
     },
     "/v1/projects/{project_id}/retrieval/readiness": {
